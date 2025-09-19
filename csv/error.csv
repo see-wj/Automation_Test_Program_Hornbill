@@ -1,0 +1,2 @@
+PSU Readback Voltage,PSU Readback Current,PSU Voltage Set,Load Current Set,DMM Voltage Measured,Programming/Voltage Absolute Error (V),Relative/Voltage Percentage Error (%),PSU Readback Voltage Error (V),Programming Upper Error Boundary (V),Programming Lower Error Boundary (V),Programming Condition,Readback Upper Error Boundary (V),Readback Lower Error Boundary (V),Readback Condition
+1.00485,0.009162433,1.0,1.0,8.78091983e-06,-0.99999121908017,-99.999121908017,1.00484121908017,0.1605,-0.1605,FAIL,0.1605,-0.1605,FAIL
