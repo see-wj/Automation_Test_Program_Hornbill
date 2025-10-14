@@ -1186,4 +1186,35 @@ class Oscilloscope(Subsystem):
         self.instr.write(f"CHAN{ChannelNumber}:DISP {state}")
 
 
+
+class Hornbill(Subsystem):
+    """Child Class for Hornbill Subsystem"""
+
+    def __init__(self, VISA_ADDRESS):
+        super().__init__(VISA_ADDRESS)
+
+    def setMode(self, mode):
+        self.instr.write(f"FUNC:MODE {mode}")
+
+    def setFrequency(self, frequency):
+        self.instr.write(f"SOUR:FREQ {frequency}")
+
+    def setPower(self, power):
+        self.instr.write(f"SOUR:POW {power}")
+
+    def outputOn(self):
+        self.instr.write("OUTP ON")
+
+    def outputOff(self):
+        self.instr.write("OUTP OFF")
+
+    def queryFrequency(self):
+        return self.instr.query("SOUR:FREQ?")
+
+    def queryPower(self):
+        return self.instr.query("SOUR:POW?")
+
+    def queryOutputState(self):
+        return self.instr.query("OUTP?")
+
 print ("Keysight SCPI command List Loaded.")

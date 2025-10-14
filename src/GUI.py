@@ -39,6 +39,14 @@ from DUT_Test_Scripts.DUT_Test import (
 )
 
 from DUT_Test_Scripts.DUT_screenshot import ScreenShotDialog
+
+
+from DUT_Test_Scripts.Hornbill_DUT_Test_With_ELoad import (
+    HornbillVoltageMeasurementwithELoad,)
+
+from DUT_Test_Scripts.Hornbill_DUT_Test_No_ELoad import (
+    HornbillVoltageMeasurementNoELoad,)
+
 from data import *
 from xlreport import *
 from xlreportpower import*
@@ -738,7 +746,7 @@ class VoltageMeasurementDialog(QDialog):
         self.QComboBox_set_Function.setEnabled(False)
         self.QComboBox_set_PSU_Channel.addItems(["1", "2", "3", "4"])
         self.QComboBox_set_PSU_Channel.setEnabled(True)
-        self.QComboBox_set_ELoad_Channel.addItems(["1", "2"])
+        self.QComboBox_set_ELoad_Channel.addItems(["None", "1", "2"])
         self.QComboBox_set_ELoad_Channel.setEnabled(True)
         self.QComboBox_Voltage_Sense.addItems(["2 Wire", "4 Wire"])
         self.QComboBox_Voltage_Sense.setEnabled(True)
@@ -907,7 +915,7 @@ class VoltageMeasurementDialog(QDialog):
         self.QLineEdit_Readback_Error_Gain.setText(self.Readback_Error_Gain)
         self.QLineEdit_Readback_Error_Offset.setText(self.Readback_Error_Offset)
         self.QLineEdit_Power.setText(self.Power)
-        self.QLineEdit_rshunt.setText(self.rshunt)
+        """self.QLineEdit_rshunt.setText(self.rshunt)"""
         self.QLineEdit_minVoltage.setText(self.minVoltage)
         self.QLineEdit_maxVoltage.setText(self.maxVoltage)
         self.QLineEdit_voltage_stepsize.setText(self.voltage_step_size)
@@ -937,6 +945,9 @@ class VoltageMeasurementDialog(QDialog):
             
         elif self.selected_text =="SMU":
             self.config_file = os.path.join(config_folder,"config_SMU.txt")
+        
+        elif self.selected_text =="Hornbill":
+            self.config_file = os.path.join(config_folder,"config_Hornbill.txt")
 
         else:
             self.config_file = os.path.join(config_folder,"config_Others.txt")
@@ -982,7 +993,12 @@ class VoltageMeasurementDialog(QDialog):
                 self.QLineEdit_PSU_VisaAddress.addItems([str(self.visaIdList[i])])
                 self.QLineEdit_DMM_VisaAddress.addItems([str(self.visaIdList[i])])
                 self.QLineEdit_ELoad_VisaAddress.addItems([str(self.visaIdList[i])])
-                
+            
+            # Add "None" option at the end
+            self.QLineEdit_PSU_VisaAddress.addItem("None")
+            self.QLineEdit_DMM_VisaAddress.addItem("None")
+            self.QLineEdit_ELoad_VisaAddress.addItem("None")
+                    
         except:
             self.OutputBox.append("No Devices Found!!!")
         return   
@@ -1190,14 +1206,22 @@ class VoltageMeasurementDialog(QDialog):
             if not self.check_missing_params(dict):
                 return
 
-            #Function: Visa Address Check & Run Test
+            # Function: Visa Address Check & Run Test
             A = VisaResourceManager()
-            flag, args = A.openRM(self.ELoad, self.PSU, self.DMM)
-            if flag == 0:
-                string = ""
-                for item in args:
-                    string = string + item
 
+            # Only pass non-"None" devices
+            addresses = []
+            for addr in [self.ELoad, self.PSU, self.DMM]:
+                if addr not in [None, "None"]:
+                    addresses.append(addr)
+
+            if not addresses:
+                self.OutputBox.append("No valid VISA addresses selected.")
+                return
+
+            flag, args = A.openRM(*addresses)
+            if flag == 0:
+                string = "".join(args)
                 QMessageBox.warning(self, "VISA IO ERROR", string)
                 return
             
@@ -1212,16 +1236,55 @@ class VoltageMeasurementDialog(QDialog):
 
             #Execute Voltage Measurement
             if self.DMM_Instrument == "Keysight":
-                try:(
-                    infoList,
-                    dataList,
-                    dataList2
-                    ) = NewVoltageMeasurement.Execute_Voltage_Accuracy(self, dict)
+                if self.selected_text == "Dolphin":
+                    try:(
+                        infoList,
+                        dataList,
+                        dataList2
+                        ) = NewVoltageMeasurement.Execute_Voltage_Accuracy(self, dict)
                 
-                except Exception as e:
-                    QMessageBox.warning(self, "Error", str(e))
-                    return
-            
+                    except Exception as e:
+                        QMessageBox.warning(self, "Error", str(e))
+                        return
+                        """   elif self.selected_text == "Excavator":
+                                try:(
+                                    infoList,
+                                    dataList,
+                                    dataList2
+                                ) = ExcavatorVoltageMeasurement.Execute_Voltage_Accuracy(self, dict)
+
+                                except Exception as e:
+                                    QMessageBox.warning(self, "Error", str(e))
+                                    return
+                            elif self.selected_text == "SMU":
+                                try:(
+                                    infoList, 
+                                    dataList,
+                                    dataList2
+                                ) = SMUVoltageMeasurement.Execute_Voltage_Accuracy(self, dict)
+                                except Exception as e:
+                                    QMessageBox.warning(self, "Error", str(e))  
+                                    return"""
+                elif self.selected_text == "Hornbill":
+                    if self.ELoad != "None":
+                        try:(
+                            infoList,   
+                            dataList,
+                            dataList2
+                        ) = HornbillVoltageMeasurementwithELoad.Execute_Voltage_Accuracy(self, dict)
+                        except Exception as e:
+                            QMessageBox.warning(self, "Error", str(e))
+                            return
+                    else:
+                        try:(
+                            infoList,   
+                            dataList,
+                            dataList2
+                        ) = HornbillVoltageMeasurementNoELoad.Execute_Voltage_Accuracy(self, dict)
+                        except Exception as e:
+                            QMessageBox.warning(self, "Error", str(e))
+                            return
+                    
             #Measurement Completion
             if x == (int(self.noofloop) - 1):   
                 self.OutputBox.append("Measurement is complete !")

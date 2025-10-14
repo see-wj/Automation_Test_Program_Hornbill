@@ -45,6 +45,9 @@ args = [
     '--noconsole',
     '--name=Test_Automation_Program',
     '--distpath=Executable',
+    '--hidden-import=numpy.core._dtype_ctypes',
+    '--hidden-import=numpy._globals',
+    '--exclude-module=numpy.core._multiarray_umath',
     *[f'--add-data={data}' for data in add_data_args]
 ]
 
