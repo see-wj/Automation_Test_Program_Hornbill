@@ -72,6 +72,7 @@ class Dimport:
         Excavator = getattr(module, "Excavator")
         SMU = getattr(module, "SMU")
         Power = getattr(module, "Power")
+        Hornbill = getattr(module, "Hornbill")
 
         return (
             Read,
@@ -95,6 +96,7 @@ class Dimport:
             Excavator,
             SMU,
             Power,
+            Hornbill,
         )
 
 #Check Visa IO address
@@ -132,7 +134,7 @@ class VisaResourceManager:
         self.rm.close()
 
 ######################################################################
-class NewVoltageMeasurement:
+class DolphinNewVoltageMeasurementwithELoad:
 
     def __init__(self):
         self.results = []
@@ -163,6 +165,7 @@ class NewVoltageMeasurement:
             Excavator,
             SMU,
             Power,
+            Hornbill
         ) = Dimport.getClasses(dict["Instrument"])
 
         RST(dict["PSU"])
@@ -191,7 +194,7 @@ class NewVoltageMeasurement:
         Configure(dict["DMM"]).write("Voltage")
         Trigger(dict["DMM"]).setSource("BUS")
         Sense(dict["DMM"]).setVoltageResDC(dict["VoltageRes"])
-        Function(dict["ELoad"]).setMode(dict["setFunction"])
+        Function(dict["ELoad"]).setMode("Current")
         Function(dict["PSU"]).setMode("Voltage")
 
         #Instrument Channel Set
@@ -385,7 +388,7 @@ class NewVoltageMeasurement:
 
         return self.infoList, self.dataList, self.dataList2
 
-class NewCurrentMeasurement:
+class DolphinNewCurrentMeasurementwithELoad:
     def __init__(self):
         self.infoList = []
         self.dataList = []
@@ -469,14 +472,15 @@ class NewCurrentMeasurement:
             Excavator,
             SMU,
             Power,
+            Hornbill
         ) = Dimport.getClasses(dict["Instrument"])
 
         RST(dict["PSU"])
         WAI(dict["PSU"])
         RST(dict["ELoad"])
         WAI(dict["ELoad"])
-        RST(dict["DMM"])
-        WAI(dict["DMM"])
+        RST(dict["DMM2"])
+        WAI(dict["DMM2"])
 
         #Channel Loop (For usage of All Channels, the channel is taken from Execute Function in GUI.py)
         ch = channel

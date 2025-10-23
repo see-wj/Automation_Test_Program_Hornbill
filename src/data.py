@@ -21,36 +21,30 @@ from SCPI_Library.Keysight import System
 
 #------------------Instrument Data Collection---------------------
 class instrumentData(object):
-            """This class stores and facilitates the collection of Instrument Data to be placed in Excel Report
+    """Stores instrument IDN and SCPI version, safely handling missing or invalid addresses."""
 
-            Attributes:
-                *args: arguments should contain strings of VISA Addresses of instruments used.
-                instrumentIDN: List containing the Identification Name of the Instruments
-                instrumentVersion: List containing the SCPI Version of the Instruments
+    def __init__(self, *args):
+        instrumentIDN = []
+        instrumentVersion = []
 
-            """
-
-            def __init__(self, *args):
-                instrumentIDN = []
-                instrumentVersion = []
-
-                for x in args:
+        for x in args:
+            try:
+                if x in (None, "None"):
+                    instrumentIDN.append("N/A")
+                    instrumentVersion.append("N/A")
+                else:
                     instrumentIDN.append(IDN(x).query())
                     instrumentVersion.append(System(x).version())
+            except Exception as e:
+                instrumentIDN.append(f"Error: {e}")
+                instrumentVersion.append(f"Error: {e}")
 
-                df1 = pd.DataFrame(instrumentIDN, columns=["Instruments Used: "])
-                df2 = pd.DataFrame(instrumentVersion, columns=["SCPI Version"])
+        df1 = pd.DataFrame(instrumentIDN, columns=["Instruments Used"])
+        df2 = pd.DataFrame(instrumentVersion, columns=["SCPI Version"])
+        instrument = pd.concat([df1, df2], axis=1)
 
-                ## Shift the data in `df1` or `df2` as needed
-                #df1 = df1.shift(1)  # Shifts the entire `df1` down by one row
-                #df2 = df2.shift(1)  # Shifts the entire `df2` down by one row
-
-                # Concatenate the shifted dataframes
-                instrument = pd.concat([df1, df2], axis=1)
-
-                # Save to CSV
-                instrument.to_csv(INSTRUMENT_DATA_PATH, index=False)
-
+        instrument.to_csv(INSTRUMENT_DATA_PATH, index=False)
+        
 class powerinstrumentData(object):
             """This class stores and facilitates the collection of Instrument Data to be placed in Excel Report
 
