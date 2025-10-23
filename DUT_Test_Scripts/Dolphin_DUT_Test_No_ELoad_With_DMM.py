@@ -362,7 +362,7 @@ class DolphinNewVoltageMeasurementNoELoadWithDMM:
 
         return self.infoList, self.dataList, self.dataList2
 
-class NewCurrentMeasurement:
+class DolphinNewCurrentMeasurementNoELoadWithDMM:
     def __init__(self):
         self.infoList = []
         self.dataList = []
@@ -446,14 +446,13 @@ class NewCurrentMeasurement:
             Excavator,
             SMU,
             Power,
+            Hornbill
         ) = Dimport.getClasses(dict["Instrument"])
 
         RST(dict["PSU"])
         WAI(dict["PSU"])
-        RST(dict["ELoad"])
-        WAI(dict["ELoad"])
-        RST(dict["DMM"])
-        WAI(dict["DMM"])
+        RST(dict["DMM2"])
+        WAI(dict["DMM2"])
 
         #Channel Loop (For usage of All Channels, the channel is taken from Execute Function in GUI.py)
         ch = channel
@@ -461,12 +460,6 @@ class NewCurrentMeasurement:
         #Use ch for each individual channel
         print(f"Channel {ch} Test Running\n")
         print("")
-
-        #New Command 
-        """ Excavator(dict["PSU"]).setSYSTEMEMULationMode("SOUR")
-        WAI(dict["PSU"])
-        Excavator(dict["ELoad"]).setSYSTEMEMULationMode("LOAD")
-        WAI(dict["ELoad"])"""
         #offset
         sleep(3)
 
@@ -474,9 +467,12 @@ class NewCurrentMeasurement:
         Configure(dict["DMM2"]).write("Voltage")
         Trigger(dict["DMM2"]).setSource("BUS")
         Sense(dict["DMM2"]).setVoltageResDC(dict["VoltageRes"])
-        #Display(dict["ELoad"]).displayState(dict["ELoad_Channel"])
-        Function(dict["ELoad"]).setMode("Voltage")
+        
+         #Instrument Channel Set
+        Voltage(dict["PSU"]).setInstrumentChannel(ch)
+        sleep(2)
         Function(dict["PSU"]).setMode("Current")
+       
 
         #Set Series/Parallel Mode
         if dict["OperationMode"] == "Series":
@@ -491,7 +487,6 @@ class NewCurrentMeasurement:
         
         #Set Channel, Sense
         Voltage(dict["PSU"]).setSenseModeMultipleChannel(dict["VoltageSense"], ch)
-        Voltage(dict["ELoad"]).setSenseModeMultipleChannel(dict["VoltageSense"], dict["ELoad_Channel"])
 
         Voltage(dict["DMM2"]).setNPLC(dict["Aperture"])
         Voltage(dict["DMM2"]).setAutoZeroMode(dict["AutoZero"])
@@ -553,19 +548,6 @@ class NewCurrentMeasurement:
             if V_fixed> float(dict["maxVoltage"]):
                 V_fixed = float(dict["maxVoltage"])
 
-            # Setting to prevent draw to much voltage
-            if V_fixed == 0:
-                Voltage(dict["ELoad"]).setOutputVoltage(1)
-                WAI(dict["ELoad"])
-            elif V_fixed == float(dict["maxVoltage"]):
-                Voltage(dict["ELoad"]).setOutputVoltage(V_fixed-VshuntdropMax)
-                WAI(dict["ELoad"])
-            else:
-                Voltage(dict["ELoad"]).setOutputVoltage(V_fixed)
-                WAI(dict["ELoad"])
-
-            Output(dict["ELoad"]).setOutputState("ON")
-            WAI(dict["ELoad"])
             sleep(3)
 
             while j < current_iter:
@@ -645,14 +627,10 @@ class NewCurrentMeasurement:
         WAI(dict["PSU"])
         Current(dict["PSU"]).setOutputCurrent(0)
         WAI(dict["PSU"])
-        Voltage(dict["ELoad"]).setOutputVoltage(0)
-        WAI(dict["ELoad"])
         Output(dict["PSU"]).SPModeConnection("OFF")
         WAI(dict["PSU"])
         Output(dict["PSU"]).setOutputState("OFF")
         WAI(dict["PSU"])
-        Output(dict["ELoad"]).setOutputState("OFF")
-        WAI(dict["ELoad"])
         Output(dict["PSU"]).SPModeConnection("OFF")
         WAI(dict["PSU"])
         RST(dict["DMM2"])

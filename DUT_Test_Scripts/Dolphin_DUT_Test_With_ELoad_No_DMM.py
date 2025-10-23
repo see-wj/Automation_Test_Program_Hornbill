@@ -331,7 +331,7 @@ class DolphinNewVoltageMeasurementwithELoadNoDMM:
 
         return self.infoList, self.dataList, self.dataList2
 
-class NewCurrentMeasurement:
+class DolphinNewCurrentMeasurementwithELoadNoDMM:
     def __init__(self):
         self.infoList = []
         self.dataList = []
@@ -415,14 +415,13 @@ class NewCurrentMeasurement:
             Excavator,
             SMU,
             Power,
+            Hornbill
         ) = Dimport.getClasses(dict["Instrument"])
 
         RST(dict["PSU"])
         WAI(dict["PSU"])
         RST(dict["ELoad"])
         WAI(dict["ELoad"])
-        RST(dict["DMM"])
-        WAI(dict["DMM"])
 
         #Channel Loop (For usage of All Channels, the channel is taken from Execute Function in GUI.py)
         ch = channel
@@ -431,21 +430,19 @@ class NewCurrentMeasurement:
         print(f"Channel {ch} Test Running\n")
         print("")
 
-        #New Command 
-        """ Excavator(dict["PSU"]).setSYSTEMEMULationMode("SOUR")
-        WAI(dict["PSU"])
-        Excavator(dict["ELoad"]).setSYSTEMEMULationMode("LOAD")
-        WAI(dict["ELoad"])"""
         #offset
         sleep(3)
 
-        # Instrument Initialization
-        Configure(dict["DMM2"]).write("Voltage")
-        Trigger(dict["DMM2"]).setSource("BUS")
-        Sense(dict["DMM2"]).setVoltageResDC(dict["VoltageRes"])
+        #Instrument Channel Set
+        Voltage(dict["PSU"]).setInstrumentChannel(ch)
+        Voltage(dict["ELoad"]).setInstrumentChannel(dict["ELoad_Channel"])
+        sleep(2)
+
         #Display(dict["ELoad"]).displayState(dict["ELoad_Channel"])
         Function(dict["ELoad"]).setMode("Voltage")
         Function(dict["PSU"]).setMode("Current")
+
+        
 
         #Set Series/Parallel Mode
         if dict["OperationMode"] == "Series":
@@ -462,15 +459,6 @@ class NewCurrentMeasurement:
         Voltage(dict["PSU"]).setSenseModeMultipleChannel(dict["VoltageSense"], ch)
         Voltage(dict["ELoad"]).setSenseModeMultipleChannel(dict["VoltageSense"], dict["ELoad_Channel"])
 
-        Voltage(dict["DMM2"]).setNPLC(dict["Aperture"])
-        Voltage(dict["DMM2"]).setAutoZeroMode(dict["AutoZero"])
-        Voltage(dict["DMM2"]).setAutoImpedanceMode(dict["InputZ"])
-        #Current(dict["DMM"]).setTerminal(dict["Terminal"])
-
-        if dict["Range"] == "Auto":
-            Sense(dict["DMM2"]).setVoltageRangeDCAuto()
-        else:
-            Sense(dict["DMM2"]).setVoltageRangeDC(dict["Range"])
         
         self.param1 = float(dict["Programming_Error_Gain"])
         self.param2 = float(dict["Programming_Error_Offset"])
@@ -559,34 +547,6 @@ class NewCurrentMeasurement:
 
                 self.dataList2.insert(k, [float(temp_values), float(temp_values2)])
                 
-                #DMM Condition & Measurements
-                Initiate(dict["DMM2"]).initiate()
-                status = float(Status(dict["DMM2"]).operationCondition())
-                TRG(dict["DMM2"])
-
-                while 1:
-                    status = float(Status(dict["DMM2"]).operationCondition())
-                    
-                    if status == 8704.0:
-                        voltagemeasured = float(Fetch(dict["DMM2"]).query())
-                        currentmeasured = voltagemeasured/self.rshunt
-                        self.dataList.insert(
-
-                            k, [0 , currentmeasured]
-                        )
-                        break
-
-                    elif status == 512.0:
-                        voltagemeasured = float(Fetch(dict["DMM2"]).query())
-                        currentmeasured = voltagemeasured/self.rshunt
-                        self.dataList.insert(
-                            
-                            k, [0 , currentmeasured]
-                        )
-                        break
-                
-                WAI(dict["DMM2"])
-
                 #PSU Delay? (Up/Down Time -> Not yet configured)
                 Delay(dict["PSU"]).write(dict["DownTime"])
                 WAI(dict["PSU"])
@@ -624,8 +584,6 @@ class NewCurrentMeasurement:
         WAI(dict["ELoad"])
         Output(dict["PSU"]).SPModeConnection("OFF")
         WAI(dict["PSU"])
-        RST(dict["DMM2"])
-        WAI(dict["DMM2"])
 
         return self.infoList, self.dataList, self.dataList2
 

@@ -181,12 +181,6 @@ class DolphinNewVoltageMeasurementwithELoad:
         #Use ch for each individual channel
         print(f"Channel {ch} Test Running\n")
         print("")
-        
-        #New Command 
-        """ Excavator(dict["PSU"]).setSYSTEMEMULationMode("SOUR")
-        WAI(dict["PSU"])
-        Excavator(dict["ELoad"]).setSYSTEMEMULationMode("LOAD")
-        WAI(dict["ELoad"])"""
         #offset
         sleep(3)
 
@@ -289,7 +283,7 @@ class DolphinNewVoltageMeasurementwithELoad:
 
             #If PSU MAX I = ELOAD MAX I (Reduce Eload I by 0.1 - Prevent Overload)
             if I_fixed == float(dict["maxCurrent"]) and Iset == float(dict["maxCurrent"]):
-                Current(dict["ELoad"]).setOutputCurrent(I_fixed - 0.1)
+                Current(dict["ELoad"]).setOutputCurrent(I_fixed - 0.2)
                 WAI(dict["ELoad"])
             else:
                 Current(dict["ELoad"]).setOutputCurrent(I_fixed)
@@ -489,11 +483,6 @@ class DolphinNewCurrentMeasurementwithELoad:
         print(f"Channel {ch} Test Running\n")
         print("")
 
-        #New Command 
-        """ Excavator(dict["PSU"]).setSYSTEMEMULationMode("SOUR")
-        WAI(dict["PSU"])
-        Excavator(dict["ELoad"]).setSYSTEMEMULationMode("LOAD")
-        WAI(dict["ELoad"])"""
         #offset
         sleep(3)
 
@@ -501,9 +490,15 @@ class DolphinNewCurrentMeasurementwithELoad:
         Configure(dict["DMM2"]).write("Voltage")
         Trigger(dict["DMM2"]).setSource("BUS")
         Sense(dict["DMM2"]).setVoltageResDC(dict["VoltageRes"])
+         #Instrument Channel Set
+        Voltage(dict["PSU"]).setInstrumentChannel(ch)
+        Voltage(dict["ELoad"]).setInstrumentChannel(dict["ELoad_Channel"])
+        sleep(2)
         #Display(dict["ELoad"]).displayState(dict["ELoad_Channel"])
         Function(dict["ELoad"]).setMode("Voltage")
         Function(dict["PSU"]).setMode("Current")
+
+       
 
         #Set Series/Parallel Mode
         if dict["OperationMode"] == "Series":
@@ -687,7 +682,7 @@ class DolphinNewCurrentMeasurementwithELoad:
 
         return self.infoList, self.dataList, self.dataList2
 
-class LoadRegulation:
+class DolphinLoadRegulationwithELoad:
     def __init__(self):
         pass
 
@@ -761,6 +756,7 @@ class LoadRegulation:
             Excavator,
             SMU,
             Power,
+            Hornbill
         ) = Dimport.getClasses(dict["Instrument"])
 
         RST(dict["PSU"])
@@ -769,14 +765,6 @@ class LoadRegulation:
         WAI(dict["ELoad"])
         RST(dict["DMM"])
         WAI(dict["DMM"])
-
-        #New Command 
-        Excavator(dict["PSU"]).setSYSTEMEMULationMode("SOUR")
-        WAI(dict["PSU"])
-        Excavator(dict["ELoad"]).setSYSTEMEMULationMode("LOAD")
-        WAI(dict["ELoad"])
-        #offset
-        sleep(3)
 
         # Instrument Initializations
         #Configure(dict["DMM"]).write("Voltage")
@@ -1035,6 +1023,7 @@ class LoadRegulation:
             Excavator,
             SMU,
             Power,
+            Hornbill
         ) = Dimport.getClasses(dict["Instrument"])
 
         RST(dict["PSU"])
@@ -1044,12 +1033,6 @@ class LoadRegulation:
         RST(dict["DMM2"])
         WAI(dict["DMM2"])
 
-        #New Command 
-        Excavator(dict["PSU"]).setSYSTEMEMULationMode("SOUR")
-        WAI(dict["PSU"])
-        Excavator(dict["ELoad"]).setSYSTEMEMULationMode("LOAD")
-        WAI(dict["ELoad"])
-        #offset
         sleep(3)
 
         # Fixed Settings
@@ -1711,10 +1694,10 @@ class PowerMeasurement:
 
             return self.infoList, self.dataList, self.dataList2
 
-class RiseFallTime:
+class DolphinRiseFallTimewithELoad:
     def __init__():
         pass
-
+    #Special Case
     def executeA(
         self,
         dict,
@@ -1776,6 +1759,7 @@ class RiseFallTime:
             Excavator,
             SMU,
             Power,
+            Hornbill
         ) = Dimport.getClasses(dict["Instrument"])
 
         RST(dict["PSU"])
@@ -1785,13 +1769,7 @@ class RiseFallTime:
         WAI(dict["ELoad"])
         
         RST(dict["OSC"])
-        
-
-        #New Command 
-        Excavator(dict["PSU"]).setSYSTEMEMULationMode("SOUR")
-        WAI(dict["PSU"])
-        Excavator(dict["ELoad"]).setSYSTEMEMULationMode("LOAD")
-        WAI(dict["ELoad"])
+    
 
         self.V_Rating = float(dict["V_Rating"])
         self.I_Rating = float(dict["I_Rating"])
@@ -2072,7 +2050,7 @@ class RiseFallTime:
                 file.write(displayData)
 
             print(f"Screenshot saved at: {png_file}")
-    
+    #Normal Case
     def executeB(
         self,
         dict,
@@ -2134,6 +2112,7 @@ class RiseFallTime:
             Excavator,
             SMU,
             Power,
+            Hornbill
         ) = Dimport.getClasses(dict["Instrument"])
 
         RST(dict["PSU"])
@@ -2143,13 +2122,14 @@ class RiseFallTime:
         WAI(dict["ELoad"])
         
         RST(dict["OSC"])
-        
 
-        #New Command 
-        Excavator(dict["PSU"]).setSYSTEMEMULationMode("SOUR")
-        WAI(dict["PSU"])
-        Excavator(dict["ELoad"]).setSYSTEMEMULationMode("LOAD")
-        WAI(dict["ELoad"])
+        # Instrument Initialization
+        Function(dict["ELoad"]).setMode("Current")
+        Function(dict["PSU"]).setMode("Voltage")
+        #Instrument Channel Set
+        Voltage(dict["PSU"]).setInstrumentChannel(dict["PSU_Channel"])
+        Voltage(dict["ELoad"]).setInstrumentChannel(dict["ELoad_Channel"])
+        sleep(2)
 
         self.V_Rating = float(dict["V_Rating"])
         self.I_Rating = float(dict["I_Rating"])
@@ -2184,8 +2164,6 @@ class RiseFallTime:
         Oscilloscope(dict["OSC"]).hardcopy()
         Oscilloscope(dict["OSC"]).set_marker_Y1(0)
 
-        #Display(dict["ELoad"]).displayState(dict["ELoad_Channel"])
-        Function(dict["ELoad"]).setMode(dict["setFunction"])
         Voltage(dict["PSU"]).setSenseModeMultipleChannel(dict["VoltageSense"], dict["PSU_Channel"])
 
         repetition=0
@@ -2474,7 +2452,7 @@ class RiseFallTime:
         WAI(dict["PSU"])
         Output(dict["ELoad"]).setOutputState("OFF")
         WAI(dict["ELoad"])
-
+    #
     def executeC(
         self,
         dict,
@@ -2503,6 +2481,7 @@ class RiseFallTime:
             Excavator,
             SMU,
             Power,
+            Hornbill
         ) = Dimport.getClasses(dict["Instrument"])
 
         RST(dict["PSU"])
@@ -2512,17 +2491,11 @@ class RiseFallTime:
         WAI(dict["ELoad"])
         
         RST(dict["OSC"])
+
+        Voltage(dict["PSU"]).setInstrumentChannel(dict["PSU_Channel"])
+        Voltage(dict["ELoad"]).setInstrumentChannel(dict["ELoad_Channel"])
         
         sleep(5)
-
-        #New Command 
-        #Excavator(dict["PSU"]).setSYSTEMEMULationMode("SOUR")
-        #WAI(dict["PSU"])
-        #Excavator(dict["ELoad"]).setSYSTEMEMULationMode("LOAD")
-        #WAI(dict["ELoad"])
-        #Excavator(dict["ELoad"]).setPOSITIVECURRENTSLEW()
-        #WAI(dict["ELoad"])
-        #Excavator(dict["ELoad"]).setNEGATIVECURRENTSLEW()
 
         self.V_Rating = float(dict["V_Rating"])
         self.I_Rating = float(dict["I_Rating"])
@@ -2547,7 +2520,7 @@ class RiseFallTime:
         Oscilloscope(dict["OSC"]).setChannelCoupling(dict["DUT_OSC_Channel"], dict["DUT_Channel_CouplingMode"]) #AC
         Oscilloscope(dict["OSC"]).setTimeScale(dict["DUT_TimeScale"])
         Oscilloscope(dict["OSC"]).setVerticalScale(dict["DUT_VerticalScale"], dict["DUT_OSC_Channel"])
-        Oscilloscope(dict["OSC"]).setChannelOffest(dict["DUT_Channel_Offset"], dict["DUT_OSC_Channel"])
+        Oscilloscope(dict["OSC"]).setChannelOffset(dict["DUT_Channel_Offset"], dict["DUT_OSC_Channel"])
         Oscilloscope(dict["OSC"]).setChannelUnits(dict["DUT_Channel_Unit"], dict["DUT_OSC_Channel"])
 
 
@@ -2555,7 +2528,7 @@ class RiseFallTime:
         Oscilloscope(dict["OSC"]).setProbeAttenuation(dict["CurrentTrigger_Probe_Setting"], dict["CurrentTrigger_OSC_Channel"])
         Oscilloscope(dict["OSC"]).setChannelCoupling(dict["CurrentTrigger_OSC_Channel"], dict["CurrentTrigger_Channel_CouplingMode"]) #AC
         Oscilloscope(dict["OSC"]).setVerticalScale(dict["CurrentTrigger_VerticalScale"], dict["CurrentTrigger_OSC_Channel"])
-        Oscilloscope(dict["OSC"]).setChannelOffest(dict["CurrentTrigger_Channel_Offset"], dict["CurrentTrigger_OSC_Channel"])
+        Oscilloscope(dict["OSC"]).setChannelOffset(dict["CurrentTrigger_Channel_Offset"], dict["CurrentTrigger_OSC_Channel"])
         Oscilloscope(dict["OSC"]).setChannelUnits(dict["CurrentTrigger_Channel_Unit"], dict["CurrentTrigger_OSC_Channel"])
         Oscilloscope(dict["OSC"]).setTriggerSource(dict["CurrentTrigger_OSC_Channel"])
         Oscilloscope(dict["OSC"]).setTriggerEdgeLevel(self.CurrentTrigger_V_Settling_Band, dict["CurrentTrigger_OSC_Channel"])
@@ -2579,8 +2552,12 @@ class RiseFallTime:
         Oscilloscope(dict["OSC"]).setChannel_Display("1", dict["DUT_OSC_Channel"])
 
 
+        #Display(dict["ELoad"]).displayState(dict["ELoad_Channel"])
         Function(dict["ELoad"]).setMode(dict["setFunction"])
-        Voltage(dict["PSU"]).setSenseMode(dict["VoltageSense"])
+        Voltage(dict["ELoad"]).setInstrumentChannel(dict["ELoad_Channel"])
+        Voltage(dict["PSU"]).setInstrumentChannel(dict["PSU_Channel"])
+        Voltage(dict["PSU"]).setSenseModeMultipleChannel(dict["VoltageSense"], dict["PSU_Channel"])
+
 
 
         #Normal case (50 <-> 100%) High Voltage Condition
@@ -2658,67 +2635,67 @@ class RiseFallTime:
         if self.DUT_V_Settling_Band >= 0 and self.DUT_V_Settling_Band <= 0.001: # 1mV
             VScale = 0.001 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band > 0.001 and self.DUT_V_Settling_Band <= 0.002: # 2mV
             VScale = 0.002 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
             
         elif self.DUT_V_Settling_Band >0.002 and self.DUT_V_Settling_Band<= 0.005: # 5mV
             VScale = 0.005 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
         elif self.DUT_V_Settling_Band >0.005 and self.DUT_V_Settling_Band<= 0.01: # 10mV
             VScale = 0.01 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band >0.01 and self.DUT_V_Settling_Band <= 0.02: # 20mV
             VScale = 0.02 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band >0.02 and self.DUT_V_Settling_Band <= 0.05: # 50mV
             VScale = 0.05 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band > 0.05 and self.DUT_V_Settling_Band<= 0.1: # 100mV
             VScale = 0.1 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band > 0.1 and self.DUT_V_Settling_Band<= 0.2: # 200mV
             VScale = 0.2 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
         elif self.DUT_V_Settling_Band > 0.2 and self.DUT_V_Settling_Band<= 0.5: # 500mV
             VScale = 0.5
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band > 0.5 and self.DUT_V_Settling_Band<= 1: # 1V
             VScale = 1 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band > 1 and self.DUT_V_Settling_Band<= 2: # 2V
             VScale = 2 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band > 2 and self.DUT_V_Settling_Band<= 5: # 5V
             VScale = 5 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band > 5 and self.DUT_V_Settling_Band<= 10: # 10V
             VScale = 2
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
         
         
         I_Offset_shift_factor = 4
@@ -2726,77 +2703,77 @@ class RiseFallTime:
         if self.CurrentTrigger_V_Settling_Band > 0 and self.CurrentTrigger_V_Settling_Band <= 0.001: # 1mA
             IScale = 0.001 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale , dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale , dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band > 0.001 and self.CurrentTrigger_V_Settling_Band<= 0.002: # 2mA
             IScale = 0.002 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale, dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale, dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band > 0.002 and self.CurrentTrigger_V_Settling_Band<= 0.005: # 5mA
             IScale = 0.005 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale , dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale , dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 0.005 and self.CurrentTrigger_V_Settling_Band<= 0.01: # 10mA
             IScale = 0.01 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale , dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale , dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 0.01 and self.CurrentTrigger_V_Settling_Band<= 0.02: # 20mA
             IScale = 0.02 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale, dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale, dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 0.02 and self.CurrentTrigger_V_Settling_Band<= 0.05: # 50mA
             IScale = 0.05 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale, dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale, dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 0.05 and self.CurrentTrigger_V_Settling_Band<= 0.1: # 100mA
             IScale = 0.1 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale, dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale, dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 0.1 and self.CurrentTrigger_V_Settling_Band<= 0.2: # 200mA
             IScale = 0.2 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale, dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale, dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 0.2 and self.CurrentTrigger_V_Settling_Band<= 0.5: # 500mA
             IScale = 0.5 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale, dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale, dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 0.5 and self.CurrentTrigger_V_Settling_Band<= 1: # 1A
             IScale = 1 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale , dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale , dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  >1 and self.CurrentTrigger_V_Settling_Band<= 2: # 2A
             IScale = 2 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale , dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale , dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 2 and self.CurrentTrigger_V_Settling_Band<= 5: # 5A  
             IScale = 5 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale , dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale , dict["CurrentTrigger_OSC_Channel"])
         
         elif self.CurrentTrigger_V_Settling_Band  > 5 and self.CurrentTrigger_V_Settling_Band<= 10: # 10A
             IScale = 2 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor , dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor , dict["CurrentTrigger_OSC_Channel"])
         
         elif self.CurrentTrigger_V_Settling_Band  > 10 and self.CurrentTrigger_V_Settling_Band<= 20: # 20A
             IScale = 15 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale , dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale , dict["CurrentTrigger_OSC_Channel"])
         
         elif self.CurrentTrigger_V_Settling_Band  > 20 and self.CurrentTrigger_V_Settling_Band<= 30: # 50A
             IScale = 25 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale , dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale , dict["CurrentTrigger_OSC_Channel"])
         
         Oscilloscope(dict["OSC"]).setChannel_Display("0", dict["DUT_OSC_Channel"])
         Oscilloscope(dict["OSC"]).setChannel_Display("1", dict["DUT_OSC_Channel"])
@@ -2823,112 +2800,112 @@ class RiseFallTime:
             if abs(Vmin[0]) - (VScale*4) <= (0.001 * multiplier_scale_DUT):
                 VScale = VScale + (0.001 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (0.002 * multiplier_scale_DUT):
                 VScale = VScale + (0.002 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (0.005 * multiplier_scale_DUT):
                 VScale = VScale + (0.005 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (0.01 * multiplier_scale_DUT):
                 VScale = VScale + (0.01 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (0.02 * multiplier_scale_DUT):
                 VScale = VScale + (0.02 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (0.05 * multiplier_scale_DUT):
                 VScale = VScale + (0.05 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (0.1 * multiplier_scale_DUT):
                 VScale = VScale +(0.1 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (0.2 * multiplier_scale_DUT):
                 VScale = VScale + (0.2 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (0.5 * multiplier_scale_DUT):
                 VScale = VScale + (0.5 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (1 * multiplier_scale_DUT):
                 VScale = VScale + (1 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (2 * multiplier_scale_DUT):
                 VScale = VScale + (2 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             else:
                 VScale = VScale
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
             
             if abs(Irise[0]) > (IScale*4):
                 if abs(Irise[0]) - (IScale*4) <= (0.001 * multiplier_scale_TRI):
                     IScale = IScale + (0.001 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])  
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (0.002 * multiplier_scale_TRI):
                     IScale = IScale + (0.002 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (0.005 * multiplier_scale_TRI):
                     IScale = IScale + (0.005 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (0.01 * multiplier_scale_TRI):
                     IScale = IScale + (0.01 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (0.02 * multiplier_scale_TRI):
                     IScale = IScale + (0.02 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (0.05 * multiplier_scale_TRI):
                     IScale = IScale + (0.05 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (0.1 * multiplier_scale_TRI): 
                     IScale = IScale + (0.1 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (0.2 * multiplier_scale_TRI):
                     IScale = IScale + (0.2 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (0.5 * multiplier_scale_TRI):
                     IScale = IScale + (0.5 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (1 * multiplier_scale_TRI):
                     IScale = IScale + (1 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (2 * multiplier_scale_TRI):
                     IScale = IScale + (2 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 else:
                     IScale = IScale
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
             
             #Rerun (50<->100% Loading)
             #Falling Detect
@@ -3013,112 +2990,112 @@ class RiseFallTime:
             if abs(Vmax[0]) - (VScale*4) <= (0.001 * multiplier_scale_DUT):
                 VScale = VScale + (0.001 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <= (0.002 * multiplier_scale_DUT): 
                 VScale = VScale + (0.002 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <= (0.005 * multiplier_scale_DUT):
                 VScale = VScale + (0.005 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <= (0.01 * multiplier_scale_DUT):
                 VScale = VScale + (0.01 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <= (0.02 * multiplier_scale_DUT):
                 VScale = VScale + (0.02 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <= (0.05 * multiplier_scale_DUT):
                 VScale = VScale + (0.05 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
                 
             elif abs(Vmax[0]) - (VScale*4) <= (0.1 * multiplier_scale_DUT):
                 VScale = VScale + (0.1 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <=( 0.2 * multiplier_scale_DUT):
                 VScale = VScale + (0.2 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <= (0.5 * multiplier_scale_DUT):
                 VScale = VScale + (0.5 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <= (1 * multiplier_scale_DUT):
                 VScale = VScale + (1 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <= (2 * multiplier_scale_DUT):  
                 VScale = VScale +( 2 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             else:   
                 VScale = VScale
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
             
             if abs(Ifall[0]) > (IScale*4):
                 if abs(Ifall[0]) - (IScale*4) <= (0.001 * multiplier_scale_TRI):
                     IScale = IScale +( 0.001 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= (0.002 * multiplier_scale_TRI):
                     IScale = IScale + (0.002 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= (0.005 * multiplier_scale_TRI):
                     IScale = IScale +( 0.005 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= 0.01 * multiplier_scale_TRI:
                     IScale = IScale + (0.01  * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= 0.02 * multiplier_scale_TRI:
                     IScale = IScale + (0.02  * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= 0.05 * multiplier_scale_TRI:
                     IScale = IScale + (0.05  * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= 0.1  * multiplier_scale_TRI:
                     IScale = IScale + (0.1 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= 0.2  * multiplier_scale_TRI:
                     IScale = IScale +( 0.2 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= 0.5  * multiplier_scale_TRI:
                     IScale = IScale + (0.5 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= 1 * multiplier_scale_TRI:
                     IScale = IScale + (1 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= 2 * multiplier_scale_TRI:
                     IScale = IScale +( 2 * multiplier_scale_TRI  )
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 else:
                     IScale = IScale
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
             
             #Rerun (100<->50% Loading)
             #Rasing Detect
@@ -3194,7 +3171,7 @@ class RiseFallTime:
 
         VScale = 0.5
         Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-        Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+        Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
         TScale = 0.3
         Oscilloscope(dict["OSC"]).setTimeScale(TScale)
 
@@ -3217,67 +3194,67 @@ class RiseFallTime:
         if self.CurrentTrigger_V_Settling_Band > 0 and self.CurrentTrigger_V_Settling_Band <= 0.001: # 1mA
             IScale = 0.001 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale , dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale , dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band > 0.001 and self.CurrentTrigger_V_Settling_Band<= 0.002: # 2mA
             IScale = 0.002 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale, dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale, dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band > 0.002 and self.CurrentTrigger_V_Settling_Band<= 0.005: # 5mA
             IScale = 0.005 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale , dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale , dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 0.005 and self.CurrentTrigger_V_Settling_Band<= 0.01: # 10mA
             IScale = 0.01 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale , dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale , dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 0.01 and self.CurrentTrigger_V_Settling_Band<= 0.02: # 20mA
             IScale = 0.02 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale, dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale, dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 0.02 and self.CurrentTrigger_V_Settling_Band<= 0.05: # 50mA
             IScale = 0.05 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale, dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale, dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 0.05 and self.CurrentTrigger_V_Settling_Band<= 0.1: # 100mA
             IScale = 0.1 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale, dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale, dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 0.1 and self.CurrentTrigger_V_Settling_Band<= 0.2: # 200mA
             IScale = 0.2 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale, dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale, dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 0.2 and self.CurrentTrigger_V_Settling_Band<= 0.5: # 500mA
             IScale = 0.5 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale, dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale, dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 0.5 and self.CurrentTrigger_V_Settling_Band<= 1: # 1A
             IScale = 1 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale , dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale , dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  >1 and self.CurrentTrigger_V_Settling_Band<= 2: # 2A
             IScale = 2 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale , dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale , dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 2 and self.CurrentTrigger_V_Settling_Band<= 10: # 5A  
             IScale = 5 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale , dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale , dict["CurrentTrigger_OSC_Channel"])
         
         elif self.CurrentTrigger_V_Settling_Band  > 10 and self.CurrentTrigger_V_Settling_Band<= 20: # 10A
             IScale = 10
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor , dict["CurrentTrigger_OSC_Channel"])
+            Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor , dict["CurrentTrigger_OSC_Channel"])
         
     
         #########################################
@@ -3305,112 +3282,112 @@ class RiseFallTime:
             if abs(Vmin[0]) - (VScale*4) <= (0.001 * multiplier_scale_DUT):
                 VScale = VScale + (0.001 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (0.002 * multiplier_scale_DUT):
                 VScale = VScale + (0.002 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (0.005 * multiplier_scale_DUT):
                 VScale = VScale + (0.005 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (0.01 * multiplier_scale_DUT):
                 VScale = VScale + (0.01 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (0.02 * multiplier_scale_DUT):
                 VScale = VScale + (0.02 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (0.05 * multiplier_scale_DUT):
                 VScale = VScale + (0.05 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (0.1 * multiplier_scale_DUT):
                 VScale = VScale +(0.1 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (0.2 * multiplier_scale_DUT):
                 VScale = VScale + (0.2 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (0.5 * multiplier_scale_DUT):
                 VScale = VScale + (0.5 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (1 * multiplier_scale_DUT):
                 VScale = VScale + (1 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmin[0]) - (VScale*4) <= (2 * multiplier_scale_DUT):
                 VScale = VScale + (2 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             else:
                 VScale = VScale
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
             
             if abs(Irise[0]) > (IScale*4):
                 if abs(Irise[0]) - (IScale*4) <= (0.001 * multiplier_scale_TRI):
                     IScale = IScale + (0.001 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])  
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (0.002 * multiplier_scale_TRI):
                     IScale = IScale + (0.002 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (0.005 * multiplier_scale_TRI):
                     IScale = IScale + (0.005 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (0.01 * multiplier_scale_TRI):
                     IScale = IScale + (0.01 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (0.02 * multiplier_scale_TRI):
                     IScale = IScale + (0.02 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (0.05 * multiplier_scale_TRI):
                     IScale = IScale + (0.05 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (0.1 * multiplier_scale_TRI): 
                     IScale = IScale + (0.1 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (0.2 * multiplier_scale_TRI):
                     IScale = IScale + (0.2 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (0.5 * multiplier_scale_TRI):
                     IScale = IScale + (0.5 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (1 * multiplier_scale_TRI):
                     IScale = IScale + (1 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Irise[0]) - (IScale*4) <= (2 * multiplier_scale_TRI):
                     IScale = IScale + (2 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 else:
                     IScale = IScale
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
             
             #Rerun (50<->100% Loading)
             #Falling Detect
@@ -3495,112 +3472,112 @@ class RiseFallTime:
             if abs(Vmax[0]) - (VScale*4) <= (0.001 * multiplier_scale_DUT):
                 VScale = VScale + (0.001 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <= (0.002 * multiplier_scale_DUT): 
                 VScale = VScale + (0.002 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <= (0.005 * multiplier_scale_DUT):
                 VScale = VScale + (0.005 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <= (0.01 * multiplier_scale_DUT):
                 VScale = VScale + (0.01 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <= (0.02 * multiplier_scale_DUT):
                 VScale = VScale + (0.02 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <= (0.05 * multiplier_scale_DUT):
                 VScale = VScale + (0.05 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
                 
             elif abs(Vmax[0]) - (VScale*4) <= (0.1 * multiplier_scale_DUT):
                 VScale = VScale + (0.1 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <=( 0.2 * multiplier_scale_DUT):
                 VScale = VScale + (0.2 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <= (0.5 * multiplier_scale_DUT):
                 VScale = VScale + (0.5 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <= (1 * multiplier_scale_DUT):
                 VScale = VScale + (1 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             elif abs(Vmax[0]) - (VScale*4) <= (2 * multiplier_scale_DUT):  
                 VScale = VScale +( 2 * multiplier_scale_DUT)
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
 
             else:   
                 VScale = VScale
                 Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-                Oscilloscope(dict["OSC"]).setChannelOffest(-1*(VScale), dict["DUT_OSC_Channel"])
+                Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
             
             if abs(Ifall[0]) > (IScale*4):
                 if abs(Ifall[0]) - (IScale*4) <= (0.001 * multiplier_scale_TRI):
                     IScale = IScale +( 0.001 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= (0.002 * multiplier_scale_TRI):
                     IScale = IScale + (0.002 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= (0.005 * multiplier_scale_TRI):
                     IScale = IScale +( 0.005 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= 0.01 * multiplier_scale_TRI:
                     IScale = IScale + (0.01  * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= 0.02 * multiplier_scale_TRI:
                     IScale = IScale + (0.02  * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= 0.05 * multiplier_scale_TRI:
                     IScale = IScale + (0.05  * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= 0.1  * multiplier_scale_TRI:
                     IScale = IScale + (0.1 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= 0.2  * multiplier_scale_TRI:
                     IScale = IScale +( 0.2 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= 0.5  * multiplier_scale_TRI:
                     IScale = IScale + (0.5 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= 1 * multiplier_scale_TRI:
                     IScale = IScale + (1 * multiplier_scale_TRI)
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 elif abs(Ifall[0]) - (IScale*4) <= 2 * multiplier_scale_TRI:
                     IScale = IScale +( 2 * multiplier_scale_TRI  )
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
                 else:
                     IScale = IScale
                     Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
-                    Oscilloscope(dict["OSC"]).setChannelOffest(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
+                    Oscilloscope(dict["OSC"]).setChannelOffset(IScale * I_Offset_shift_factor, dict["CurrentTrigger_OSC_Channel"])
             
             #Rerun (100<->50% Loading)
             #Rasing Detect
