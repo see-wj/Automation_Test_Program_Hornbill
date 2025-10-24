@@ -1048,10 +1048,10 @@ class Oscilloscope(Subsystem):
         self.instr.write(f"TRIGGER:MODE {Mode}")
 
     def setTriggerSource(self, ChannelNumber):
-        self.instr.write(f"TRIGGER:EDGE:SOURCE CHAN{ChannelNumber}")
+        self.instr.write(f"TRIGGER:EDGE:SOURCE {ChannelNumber}")
 
     def setTriggerEdgeLevel(self, value, ChannelNumber):
-        self.instr.write(f"TRIGGER:EDGE:LEVEL {value},CHANNEL{ChannelNumber}")
+        self.instr.write(f"TRIGGER:EDGE:LEVEL {value},{ChannelNumber}")
 
     def setTriggerCoupling(self, mode):
         self.instr.write(f"TRIGGER:EDGE:COUPLING {mode}")
@@ -1069,7 +1069,7 @@ class Oscilloscope(Subsystem):
         self.instr.write(f":TIMebase:RANGe {value}")
 
     def setVerticalScale(self, value, ChannelNumber):
-        self.instr.write(f":CHAN{ChannelNumber}:SCALE {value}")
+        self.instr.write(f":{ChannelNumber}:SCALE {value}")
         #self.instr.write(f":{ChannelNumber}:SCALE {value}")
 
     def setSingleMode(self):
@@ -1115,7 +1115,7 @@ class Oscilloscope(Subsystem):
         self.instr.write(':RUN; *WAI')
 
     def hardcopy (self, state):
-        self.instr.write(f':HARDcopy:INKSaver{state}')
+        self.instr.write(f':HARDcopy:INKSaver {state}')
     
     def displaydata(self):
         self.instr.write(":DISPlay:DATA? PNG")
@@ -1168,7 +1168,7 @@ class Oscilloscope(Subsystem):
 
     def setProbeAttenuation (self, value, ChannelNumber):
         #self.instr.write(f":{ChannelNumber}:PROBe {value}")
-        self.instr.write(f"CHAN{ChannelNumber}:PROB {value}")
+        self.instr.write(f":{ChannelNumber}:PROB {value}")
 
     def setAcquireType (self, mode):
         self.instr.write(f"ACQuire:TYPE {mode}")
@@ -1177,13 +1177,13 @@ class Oscilloscope(Subsystem):
         self.instr.write(f"TRIG:TV:SOUR {ChannelX}")
 
     def setChannelOffset (self, value, ChannelNumber):
-        self.instr.write(f":CHAN{ChannelNumber}:OFFSET {value}")
+        self.instr.write(f":{ChannelNumber}:OFFSET {value}")
     
     def setChannelUnits (self, mode, ChannelNumber):
-        self.instr.write(f":CHAN{ChannelNumber}:UNITs {mode}")
+        self.instr.write(f":{ChannelNumber}:UNITs {mode}")
     
     def setChannel_Display(self, state, ChannelNumber):
-        self.instr.write(f"CHAN{ChannelNumber}:DISP {state}")
+        self.instr.write(f":{ChannelNumber}:DISP {state}")
 
 
 

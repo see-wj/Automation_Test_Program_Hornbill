@@ -17,7 +17,7 @@ Readback_Error_Offset,0.005
 unit,VOLTAGE
 minCurrent,1
 maxCurrent,10
-current_step_size,5
+current_step_size,6
 minVoltage,1
 maxVoltage,32
 voltage_step_size,6

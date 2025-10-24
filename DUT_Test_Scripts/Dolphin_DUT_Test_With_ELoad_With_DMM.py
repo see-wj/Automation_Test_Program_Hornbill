@@ -2492,9 +2492,7 @@ class DolphinRiseFallTimewithELoad:
         
         RST(dict["OSC"])
 
-        Voltage(dict["PSU"]).setInstrumentChannel(dict["PSU_Channel"])
-        Voltage(dict["ELoad"]).setInstrumentChannel(dict["ELoad_Channel"])
-        
+     
         sleep(5)
 
         self.V_Rating = float(dict["V_Rating"])
@@ -2514,7 +2512,6 @@ class DolphinRiseFallTimewithELoad:
         self.voltagemax = float(dict["maxVoltage"])
 
         # Instruments Settings
-
         Oscilloscope(dict["OSC"]).setChannel_Display("1", dict["DUT_OSC_Channel"])
         Oscilloscope(dict["OSC"]).setProbeAttenuation(dict["DUT_Probe_Setting"], dict["DUT_OSC_Channel"])
         Oscilloscope(dict["OSC"]).setChannelCoupling(dict["DUT_OSC_Channel"], dict["DUT_Channel_CouplingMode"]) #AC
@@ -2533,7 +2530,6 @@ class DolphinRiseFallTimewithELoad:
         Oscilloscope(dict["OSC"]).setTriggerSource(dict["CurrentTrigger_OSC_Channel"])
         Oscilloscope(dict["OSC"]).setTriggerEdgeLevel(self.CurrentTrigger_V_Settling_Band, dict["CurrentTrigger_OSC_Channel"])
 
-
         Oscilloscope(dict["OSC"]).setAcquireType(dict["CurrentTrigger_Acq_Type"])
         Oscilloscope(dict["OSC"]).setTriggerMode(dict["CurrentTrigger_Trigger_Mode"])
         Oscilloscope(dict["OSC"]).setChannelCoupling(dict["CurrentTrigger_OSC_Channel"], dict["CurrentTrigger_Channel_CouplingMode"])
@@ -2551,14 +2547,11 @@ class DolphinRiseFallTimewithELoad:
         Oscilloscope(dict["OSC"]).setChannel_Display("0", dict["DUT_OSC_Channel"])
         Oscilloscope(dict["OSC"]).setChannel_Display("1", dict["DUT_OSC_Channel"])
 
-
         #Display(dict["ELoad"]).displayState(dict["ELoad_Channel"])
-        Function(dict["ELoad"]).setMode(dict["setFunction"])
         Voltage(dict["ELoad"]).setInstrumentChannel(dict["ELoad_Channel"])
+        Function(dict["ELoad"]).setMode("Current")
         Voltage(dict["PSU"]).setInstrumentChannel(dict["PSU_Channel"])
         Voltage(dict["PSU"]).setSenseModeMultipleChannel(dict["VoltageSense"], dict["PSU_Channel"])
-
-
 
         #Normal case (50 <-> 100%) High Voltage Condition
         #PSU Setting Voltage and Current
