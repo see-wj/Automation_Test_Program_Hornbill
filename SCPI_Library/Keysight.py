@@ -1042,7 +1042,7 @@ class Oscilloscope(Subsystem):
 
     def setChannelCoupling(self, ChannelNumber, Mode):
         #self.instr.write(f":{ChannelNumber}:COUPLING {Mode}")
-        self.instr.write(f":CHAN{ChannelNumber}:COUPLING {Mode}")
+        self.instr.write(f":{ChannelNumber}:COUPLING {Mode}")
 
     def setTriggerMode(self, Mode):
         self.instr.write(f"TRIGGER:MODE {Mode}")
@@ -1184,6 +1184,9 @@ class Oscilloscope(Subsystem):
     
     def setChannel_Display(self, state, ChannelNumber):
         self.instr.write(f":{ChannelNumber}:DISP {state}")
+    
+    def setMarkerXY_Source(self, ChannelNumber):
+        self.instr.write(f":MARK:X1Y1  {ChannelNumber}")
 
 
 

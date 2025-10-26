@@ -2568,7 +2568,7 @@ class DolphinRiseFallTimewithELoad:
         I_halfLoad = IMax/2 #50% Load 
         I_reduction_based_on_rated_value = IMax * 0.01 #1% of Imax
         I_fullLoad = IMax - I_reduction_based_on_rated_value #Minus 1A prevent PSU fall into CC mode
-        I_trigger = (I_fullLoad + I_halfLoad)/ 2
+        I_trigger = ((I_fullLoad + I_halfLoad)/ 2) - (((I_fullLoad + I_halfLoad)/ 2) * 0.1)
         self.CurrentTrigger_V_Settling_Band = round (I_trigger,2)
 
         Oscilloscope(dict["OSC"]).setTriggerEdgeLevel(self.CurrentTrigger_V_Settling_Band, dict["CurrentTrigger_OSC_Channel"])
@@ -2628,67 +2628,67 @@ class DolphinRiseFallTimewithELoad:
         if self.DUT_V_Settling_Band >= 0 and self.DUT_V_Settling_Band <= 0.001: # 1mV
             VScale = 0.001 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
+            #Oscilloscope(dict["OSC"]).setChannelOffset((VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band > 0.001 and self.DUT_V_Settling_Band <= 0.002: # 2mV
             VScale = 0.002 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
+            #Oscilloscope(dict["OSC"]).setChannelOffset((VScale), dict["DUT_OSC_Channel"])
             
         elif self.DUT_V_Settling_Band >0.002 and self.DUT_V_Settling_Band<= 0.005: # 5mV
             VScale = 0.005 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
+            #scilloscope(dict["OSC"]).setChannelOffset((VScale), dict["DUT_OSC_Channel"])
 
         elif self.DUT_V_Settling_Band >0.005 and self.DUT_V_Settling_Band<= 0.01: # 10mV
             VScale = 0.01 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
+            #Oscilloscope(dict["OSC"]).setChannelOffset((VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band >0.01 and self.DUT_V_Settling_Band <= 0.02: # 20mV
             VScale = 0.02 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
+            #Oscilloscope(dict["OSC"]).setChannelOffset((VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band >0.02 and self.DUT_V_Settling_Band <= 0.05: # 50mV
             VScale = 0.05 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
+            #Oscilloscope(dict["OSC"]).setChannelOffset((VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band > 0.05 and self.DUT_V_Settling_Band<= 0.1: # 100mV
             VScale = 0.1 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
+            #Oscilloscope(dict["OSC"]).setChannelOffset((VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band > 0.1 and self.DUT_V_Settling_Band<= 0.2: # 200mV
             VScale = 0.2 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
+            #Oscilloscope(dict["OSC"]).setChannelOffset((VScale), dict["DUT_OSC_Channel"])
 
         elif self.DUT_V_Settling_Band > 0.2 and self.DUT_V_Settling_Band<= 0.5: # 500mV
             VScale = 0.5
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
+            #Oscilloscope(dict["OSC"]).setChannelOffset((VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band > 0.5 and self.DUT_V_Settling_Band<= 1: # 1V
             VScale = 1 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
+            #Oscilloscope(dict["OSC"]).setChannelOffset((VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band > 1 and self.DUT_V_Settling_Band<= 2: # 2V
             VScale = 2 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
+            #Oscilloscope(dict["OSC"]).setChannelOffset((VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band > 2 and self.DUT_V_Settling_Band<= 5: # 5V
             VScale = 5 
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
+            #Oscilloscope(dict["OSC"]).setChannelOffset((VScale), dict["DUT_OSC_Channel"])
         
         elif self.DUT_V_Settling_Band > 5 and self.DUT_V_Settling_Band<= 10: # 10V
             VScale = 2
             Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
-            Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
+            #Oscilloscope(dict["OSC"]).setChannelOffset((VScale), dict["DUT_OSC_Channel"])
         
         
         I_Offset_shift_factor = 4
@@ -2749,7 +2749,7 @@ class DolphinRiseFallTimewithELoad:
             Oscilloscope(dict["OSC"]).setChannelOffset(IScale , dict["CurrentTrigger_OSC_Channel"])
 
         elif self.CurrentTrigger_V_Settling_Band  > 2 and self.CurrentTrigger_V_Settling_Band<= 5: # 5A  
-            IScale = 5 
+            IScale = 2 
             Oscilloscope(dict["OSC"]).setVerticalScale(IScale, dict["CurrentTrigger_OSC_Channel"])
             Oscilloscope(dict["OSC"]).setChannelOffset(IScale , dict["CurrentTrigger_OSC_Channel"])
         
@@ -2770,6 +2770,7 @@ class DolphinRiseFallTimewithELoad:
         
         Oscilloscope(dict["OSC"]).setChannel_Display("0", dict["DUT_OSC_Channel"])
         Oscilloscope(dict["OSC"]).setChannel_Display("1", dict["DUT_OSC_Channel"])
+        Oscilloscope(dict["OSC"]).setMarkerXY_Source(dict["DUT_OSC_Channel"])
         
         #########################################
 
@@ -2921,10 +2922,10 @@ class DolphinRiseFallTimewithELoad:
         Xmin=Oscilloscope(dict["OSC"]).measureXMIN("CHANNEL1")
         Fallingtime=Oscilloscope(dict["OSC"]).measureFallingtime("CHANNEL1")
         Xini = np.array(Xmin) - np.array(Fallingtime)
-        print(Vmin[0])
-        print(Xmin[0])
-        print(Fallingtime[0])
-        print(Xini[0])
+        print("Vmin:", Vmin[0])
+        print("Xmin:", Xmin[0])
+        print("Fallingtime:", Fallingtime[0])
+        print("Xini:", Xini[0])
 
         #Set marker
         Oscilloscope(dict["OSC"]).set_marker_X1(Xini[0])
@@ -2935,7 +2936,7 @@ class DolphinRiseFallTimewithELoad:
         try:
             Oscilloscope(dict["OSC"]).displaydata()
             displayData=Oscilloscope(dict["OSC"]).read_binary_data()
-            print("Data retrieved successfully:", displayData)
+            #print("Data retrieved successfully:", displayData)
         except VisaIOError as e:
             print(f"Timeout or communication error: {e}")
             raise
@@ -2954,7 +2955,7 @@ class DolphinRiseFallTimewithELoad:
         with open(png_file, "wb") as file:
             file.write(displayData)
 
-        print(f"Screenshot saved at: {png_file}")
+        #print(f"Screenshot saved at: {png_file}")
 
         """if VMIN > self.V_Settling_Band:
         #Within Spec
@@ -3111,6 +3112,10 @@ class DolphinRiseFallTimewithELoad:
         Risingtime=Oscilloscope(dict["OSC"]).measureRisingtime("CHANNEL1")
         Xini = np.array(Xmax) - (np.array(Risingtime))
 
+        print("Xmax:", Xmax[0])
+        print("Risingtime:", Risingtime[0])
+        print("Xini:", Xini)
+
         #Set marker
         Oscilloscope(dict["OSC"]).set_marker_X1(Xini[0])
         Oscilloscope(dict["OSC"]).set_marker_X2(Xmax[0])
@@ -3120,9 +3125,9 @@ class DolphinRiseFallTimewithELoad:
         try:
             Oscilloscope(dict["OSC"]).displaydata()
             displayData=Oscilloscope(dict["OSC"]).read_binary_data()
-            print("Data retrieved successfully:", displayData)
+            #print("Data retrieved successfully:", displayData)
         except VisaIOError as e:
-            print(f"Timeout or communication error: {e}")
+            #print(f"Timeout or communication error: {e}")
             raise
 
         if displayData.startswith(b"#"):
@@ -3158,15 +3163,12 @@ class DolphinRiseFallTimewithELoad:
         VMax = self.power/self.currentmax
         I_halfLoad = self.currentmax/2 #50% Load 
         I_fullLoad = self.currentmax - I_reduction_based_on_rated_value #Minimum 1%
-        I_trigger = (I_fullLoad + I_halfLoad)/ 2
+        I_trigger = ((I_fullLoad + I_halfLoad)/ 2) - (((I_fullLoad + I_halfLoad)/ 2) * 0.1)
         self.CurrentTrigger_V_Settling_Band = round (I_trigger,2)
         Oscilloscope(dict["OSC"]).setTriggerEdgeLevel(self.CurrentTrigger_V_Settling_Band, dict["CurrentTrigger_OSC_Channel"])
 
-        VScale = 0.5
         Oscilloscope(dict["OSC"]).setVerticalScale(VScale, dict["DUT_OSC_Channel"])
         Oscilloscope(dict["OSC"]).setChannelOffset(-1*(VScale), dict["DUT_OSC_Channel"])
-        TScale = 0.3
-        Oscilloscope(dict["OSC"]).setTimeScale(TScale)
 
          #PSU Setting Voltage and Current
         Voltage(dict["PSU"]).setOutputVoltage(VMax)
@@ -3254,7 +3256,8 @@ class DolphinRiseFallTimewithELoad:
 
         Oscilloscope(dict["OSC"]).setChannel_Display("0", dict["DUT_OSC_Channel"])
         Oscilloscope(dict["OSC"]).setChannel_Display("1", dict["DUT_OSC_Channel"])
-
+        Oscilloscope(dict["OSC"]).setMarkerXY_Source(dict["DUT_OSC_Channel"])
+        
         #(50<->100% Loading)
         #Falling Detect
         Oscilloscope(dict["OSC"]).run()
@@ -3270,6 +3273,7 @@ class DolphinRiseFallTimewithELoad:
         Oscilloscope(dict["OSC"]).stop()
         Vmin = Oscilloscope(dict["OSC"]).measureVMIN("CHANNEL1")
         Irise = Oscilloscope(dict["OSC"]).measureVMIN("CHANNEL2")
+       
 
         """while abs(Vmin[0]) > (VScale*4):
             if abs(Vmin[0]) - (VScale*4) <= (0.001 * multiplier_scale_DUT):
@@ -3403,10 +3407,10 @@ class DolphinRiseFallTimewithELoad:
         Xmin=Oscilloscope(dict["OSC"]).measureXMIN("CHANNEL1")
         Fallingtime=Oscilloscope(dict["OSC"]).measureFallingtime("CHANNEL1")
         Xini = np.array(Xmin) - np.array(Fallingtime)
-        print(Vmin[0])
-        print(Xmin[0])
-        print(Fallingtime[0])
-        print(Xini[0])
+        print("Vmin:",Vmin[0])
+        print("Xmin:",Xmin[0])
+        print("Fallingtime:",Fallingtime[0])
+        print("Xini:",Xini[0])
 
         #Set marker
         Oscilloscope(dict["OSC"]).set_marker_X1(Xini[0])
@@ -3417,7 +3421,7 @@ class DolphinRiseFallTimewithELoad:
         try:
             Oscilloscope(dict["OSC"]).displaydata()
             displayData=Oscilloscope(dict["OSC"]).read_binary_data()
-            print("Data retrieved successfully:", displayData)
+            #print("Data retrieved successfully:", displayData)
         except VisaIOError as e:
             print(f"Timeout or communication error: {e}")
             raise
@@ -3436,7 +3440,7 @@ class DolphinRiseFallTimewithELoad:
         with open(png_file, "wb") as file:
             file.write(displayData)
 
-        print(f"Screenshot saved at: {png_file}")
+        #print(f"Screenshot saved at: {png_file}")
 
         """if VMIN > self.V_Settling_Band:
         #Within Spec
@@ -3592,6 +3596,10 @@ class DolphinRiseFallTimewithELoad:
         Xmax=Oscilloscope(dict["OSC"]).measureXMAX("CHANNEL1")
         Risingtime=Oscilloscope(dict["OSC"]).measureRisingtime("CHANNEL1")
         Xini = np.array(Xmax) - (np.array(Risingtime))
+        print("Vmax:",Vmax[0])
+        print("Xmax:",Xmax[0])
+        print("Risingtime:",Risingtime[0])
+        print("Xini:",Xini[0])
 
         #Set marker
         Oscilloscope(dict["OSC"]).set_marker_X1(Xini[0])
@@ -3602,7 +3610,7 @@ class DolphinRiseFallTimewithELoad:
         try:
             Oscilloscope(dict["OSC"]).displaydata()
             displayData=Oscilloscope(dict["OSC"]).read_binary_data()
-            print("Data retrieved successfully:", displayData)
+            #print("Data retrieved successfully:", displayData)
         except VisaIOError as e:
             print(f"Timeout or communication error: {e}")
             raise
@@ -4847,7 +4855,7 @@ class LineRegulation:
 
         return self.results
 
-class ProgrammingResponse:
+class DolphinProgrammingResponse:
     def __init__(self):
         self.results= []
         pass
@@ -4984,6 +4992,7 @@ class ProgrammingResponse:
             Excavator,
             SMU,
             Power,
+            Hornbill,
         ) = Dimport.getClasses(dict["Instrument"])
 
         ch = dict["PSU_Channel"]
@@ -5019,25 +5028,25 @@ class ProgrammingResponse:
         sleep(self.updatedelay)
 
         #Initialization
-        Oscilloscope(dict["OSC"]).setChannel_Display("1", dict["OSC_Channel"])
-        Oscilloscope(dict["OSC"]).setProbeAttenuation(dict["Probe_Setting"], dict["OSC_Channel"])
-        Oscilloscope(dict["OSC"]).setChannelCoupling(dict["OSC_Channel"], "DC") #DC
+        Oscilloscope(dict["OSC"]).setChannel_Display("1", dict["DUT_OSC_Channel"])
+        Oscilloscope(dict["OSC"]).setProbeAttenuation(dict["DUT_Probe_Setting"], dict["DUT_OSC_Channel"])
+        Oscilloscope(dict["OSC"]).setChannelCoupling(dict["DUT_OSC_Channel"], "DC") #DC
         #Oscilloscope(dict["OSC"]).setChannelUnits(dict["OSC_Channel_Unit"], dict["OSC_Channel"])
 
-        Oscilloscope(dict["OSC"]).setTriggerMode(dict["Trigger_Mode"])
-        Oscilloscope(dict["OSC"]).setTriggerSource(dict["OSC_Channel"])
-        Oscilloscope(dict["OSC"]).setTriggerEdgeLevel(self.MaxV_TriggerLevel, dict["OSC_Channel"])
+        Oscilloscope(dict["OSC"]).setTriggerMode(dict["DUT_Trigger_Mode"])
+        Oscilloscope(dict["OSC"]).setTriggerSource(dict["DUT_OSC_Channel"])
+        Oscilloscope(dict["OSC"]).setTriggerEdgeLevel(self.MaxV_TriggerLevel, dict["DUT_OSC_Channel"])
 
         Oscilloscope(dict["OSC"]).setTriggerHFReject(1)
         Oscilloscope(dict["OSC"]).setTriggerNoiseReject(1)
         #Oscilloscope(dict["OSC"]).on_displaycursor()
-        Oscilloscope(dict["OSC"]).setTriggerSweepMode(dict["Trigger_SweepMode"])
-        Oscilloscope(dict["OSC"]).setTriggerSlope(dict["Trigger_SlopeMode"])
+        Oscilloscope(dict["OSC"]).setTriggerSweepMode(dict["DUT_Trigger_SweepMode"])
+        Oscilloscope(dict["OSC"]).setTriggerSlope(dict["DUT_Trigger_SlopeMode"])
         #Oscilloscope(dict["OSC"]).hardcopy("OFF")
         #Oscilloscope(dict["OSC"]).set_marker_Y1(0)
-        Oscilloscope(dict["OSC"]).setTimeScale(dict["TimeScale"])
-        Oscilloscope(dict["OSC"]).setVerticalScale(dict["VerticalScale"], dict["OSC_Channel"])
-        Oscilloscope(dict["OSC"]).setChannelOffset(5, dict["OSC_Channel"])
+        Oscilloscope(dict["OSC"]).setTimeScale(dict["DUT_TimeScale"])
+        Oscilloscope(dict["OSC"]).setVerticalScale(dict["DUT_VerticalScale"], dict["DUT_OSC_Channel"])
+        Oscilloscope(dict["OSC"]).setChannelOffset(5, dict["DUT_OSC_Channel"])
         sleep(3)
 
         Voltage(dict["PSU"]).setSenseModeMultipleChannel("EXT", dict["PSU_Channel"])
@@ -5084,10 +5093,10 @@ class ProgrammingResponse:
             chosen_scale = max(available_scales)  # fallback if none fit (rare)
 
         # Only set if different from current setting
-        if float(dict["VerticalScale"]) != chosen_scale:
-            Oscilloscope(dict["OSC"]).setVerticalScale(chosen_scale, dict["OSC_Channel"])
+        if float(dict["DUT_VerticalScale"]) != chosen_scale:
+            Oscilloscope(dict["OSC"]).setVerticalScale(chosen_scale, dict["DUT_OSC_Channel"])
 
-        Oscilloscope(dict["OSC"]).setTriggerEdgeLevel(self.MaxI_TriggerLevel, dict["OSC_Channel"])
+        Oscilloscope(dict["OSC"]).setTriggerEdgeLevel(self.MaxI_TriggerLevel, dict["DUT_OSC_Channel"])
         Voltage(dict["PSU"]).setOutputVoltage(0)
         WAI(dict["PSU"])
         self.No_Load_Test(dict, self.Vo, self.V_Max)

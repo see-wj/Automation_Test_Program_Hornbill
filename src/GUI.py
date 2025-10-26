@@ -4127,7 +4127,6 @@ class TransientRecoveryTimeWithCurrentSensor(QDialog):
         QLabel_Save_Path.setText("Drive Location/Output Wndow:")
 
         # Connections
-
         QLabel_PSU_VisaAddress = QLabel()
         QLabel_OSC_VisaAddress = QLabel()
         QLabel_ELoad_VisaAddress = QLabel()
@@ -4482,7 +4481,6 @@ class TransientRecoveryTimeWithCurrentSensor(QDialog):
         self.setLayout(layout1)
 
         
-
         QPushButton_Widget0.clicked.connect(self.doFind)
         QPushButton_Widget.clicked.connect(self.executeTest)
     
@@ -4979,154 +4977,684 @@ class ProgrammingSpeed(QDialog):
         """ "Method declaring the Widgets, Signals & Slots for Programming Speed."""
         super().__init__()
 
+         # Default Values
+        self.PSU = "USB0::0x2A8D::0xCC04::MY00000037::0::INSTR"
+        self.OSC = "USB0::0x0957::0x17B0::MY52060151::0::INSTR"
+        self.ELoad = "USB0::0x2A8D::0x3902::MY60260005::0::INSTR"
+        self.ELoad_Channel = "1"
+        self.PSU_Channel = "2"
+        self.DUT_OSC_Channel = "CHANNEL1"
+        self.TriggerSource = "CHANNEL1"
+        self.setFunction = "Current"
+
+        self.VoltageSense = "EXT"
+        self.Power_Rating = "160"
+        self.Current_Rating = "120"
+        self.Voltage_Rating = "80"
+        self.maxCurrent = "10"
+        self.maxVoltage = "80"
+
+        self.relay_voltage = "RELAY"
+        
+        #From OSC view
+        self.DUT_Channel_Unit = "VOLT"
+        self.DUT_Channel_Offset = "0"
+    
+        self.DUT_Channel_CouplingMode = "DC"
+        self.DUT_Trigger_CouplingMode = "DC"
+        self.DUT_Trigger_Mode = "EDGE"
+        self.DUT_Trigger_SweepMode = "NORMAL"
+        self.DUT_Trigger_SlopeMode = "EITHer"
+        self.DUT_TimeScale = "0.01"
+        self.DUT_VerticalScale = "0.00001"
+        self.DUT_V_Settling_Band = "0.8"
+        self.DUT_T_Settling_Band = "0.001"
+        self.DUT_Probe_Setting = "X10"
+        self.DUT_Acq_Type = "AVERage"
+        self.DUT_Unit = "VOLT"
+
+        #CV Programming Speed Response Limits
+        self.Programming_Response_Up_NoLoad = "0.008"
+        self.Programming_Response_Up_FullLoad = "0.008"
+        self.Programming_Response_Down_NoLoad = "0.5"
+        self.Programming_Response_Down_FullLoad = "0.06"
+
+        #Delay Time
+        self.updatedelay = "3"
+
+        self.savelocation = "C:/PyVisa - Copy  - Excavator - Copy/PyVisa/Test Data/File Export Testing"
+
+
         self.setWindowTitle("Programming Speed")
 
+        QPushButton_Widget00 = QPushButton()
+        QPushButton_Widget00.setText("Save Path")
+        QPushButton_Widget0 = QPushButton()
+        QPushButton_Widget0.setText("Find Instruments")
         QPushButton_Widget = QPushButton()
         QPushButton_Widget.setText("Execute Test")
+
+        
+    
         layout1 = QFormLayout()
         self.OutputBox = QTextBrowser()
         self.OutputBox.append(my_result.getvalue())
 
+        Desp0 = QLabel()
         Desp1 = QLabel()
         Desp2 = QLabel()
         Desp3 = QLabel()
         Desp4 = QLabel()
+        Desp8 = QLabel()
 
+        Desp0.setFont(desp_font)
         Desp1.setFont(desp_font)
         Desp2.setFont(desp_font)
         Desp3.setFont(desp_font)
         Desp4.setFont(desp_font)
+        Desp8.setFont(desp_font)
 
+        Desp0.setText("Save Path:")
         Desp1.setText("Connections:")
         Desp2.setText("General Settings:")
-        Desp3.setText("Test Settings:")
-        Desp4.setText("Oscilloscope Settings:")
+        Desp3.setText("Specification/Test Settings:")
+        Desp4.setText("DUT Oscilloscope Settings:")
+        Desp8.setText("External Auxiliary Equipment Settings:")
 
+        #Save Path
+        QLabel_Save_Path = QLabel()
+        QLabel_Save_Path.setFont(desp_font)
+        QLabel_Save_Path.setText("Drive Location/Output Wndow:")
+
+        # Connections
         QLabel_PSU_VisaAddress = QLabel()
         QLabel_OSC_VisaAddress = QLabel()
+        QLabel_ELoad_VisaAddress = QLabel()
+        QLabel_DUT = QLabel()
+
         QLabel_PSU_VisaAddress.setText("Visa Address (PSU):")
         QLabel_OSC_VisaAddress.setText("Visa Address (OSC):")
-        QLineEdit_PSU_VisaAddress = QLineEdit()
-        QLineEdit_OSC_VisaAddress = QLineEdit()
+        QLabel_ELoad_VisaAddress.setText("Visa Address (ELoad):")
+        QLabel_DUT.setText("DUT:")
 
-        QLabel_PSU_Display_Channel = QLabel()
-        QLabel_OSC_Display_Channel = QLabel()
+        self.QLineEdit_PSU_VisaAddress = QComboBox()
+        self.QLineEdit_OSC_VisaAddress = QComboBox()
+        self.QLineEdit_ELoad_VisaAddress = QComboBox()
+        self.QComboBox_DUT = QComboBox()
+
+        # General Settings
+        self.QLineEdit_PSU_VisaAddress.addItems(["USB0::0x2A8D::0xDA04::CN24350097::0::INSTR"])
+        self.QLineEdit_OSC_VisaAddress.addItems(["USB0::0x2A8D::0x1601::MY60094787::0::INSTR"])
+        self.QLineEdit_ELoad_VisaAddress.addItems(["USB0::0x2A8D::0xDA04::CN24350105::0::INSTR"])
+        self.QComboBox_DUT.addItems(["Others", "Excavator", "EDU36311A", "Dolphin", "Hornbill", "SMU"])
+
+        QLabel_OSC_DUT_Display_Channel = QLabel() #DUT Source 
+        QLabel_Trigger_Source_Display_Channel = QLabel()
+
+        QLabel_set_PSU_Channel = QLabel()
+        QLabel_set_ELoad_Channel = QLabel()
+        QLabel_set_Function = QLabel()
         QLabel_Voltage_Sense = QLabel()
+        QLabel_Power_Rating = QLabel()
+        QLabel_maxVoltage = QLabel()
+        QLabel_voltage_rated = QLabel()
+        QLabel_current_rated = QLabel()
+        QLabel_maxCurrent = QLabel()
 
-        QComboBox_Voltage_Sense = QComboBox()
+        QLabel_DUT_V_Settling_Band = QLabel()
+        QLabel_DUT_T_Settling_Band = QLabel()
+        QLabel_DUT_Probe_Setting = QLabel()
+        QLabel_DUT_Acq_Type = QLabel()
 
-        QComboBox_Voltage_Sense.addItems(["4 Wire", "2 Wire"])
-
-        QLabel_PSU_Display_Channel.setText("Display Channel (PSU):")
-        QLabel_OSC_Display_Channel.setText("Display Channel (OSC)")
+        QLabel_OSC_DUT_Display_Channel.setText("DUT Display Channel (OSC)")
+        QLabel_Trigger_Source_Display_Channel.setText("Trigger Source Channel (OSC)")
+        
+        QLabel_set_PSU_Channel.setText("Set PSU Channel:")
+        QLabel_set_ELoad_Channel.setText("Set Eload Channel:")
+        QLabel_set_Function.setText("Mode(Eload):")
         QLabel_Voltage_Sense.setText("Voltage Sense:")
-        QLineEdit_PSU_Display_Channel = QLineEdit()
-        QLineEdit_OSC_Display_Channel = QLineEdit()
+        QLabel_Power_Rating.setText("Power Rating (W):")
+        QLabel_maxVoltage.setText("Testing Voltage (V):")
+        QLabel_voltage_rated.setText("DUT Rated Voltage:")
+        QLabel_current_rated.setText("DUT Rated Current:")
+        QLabel_maxCurrent.setText("Testing Current (A):")
+        
+        """QLabel_DUT_V_Settling_Band.setText("DUT Settling Band Voltage (V) / Error Band:")
+        QLabel_DUT_T_Settling_Band.setText("DUT Settling Band Time (s):")"""
+        QLabel_DUT_Probe_Setting.setText("DUT Probe Setting Ratio:")
+        QLabel_DUT_Acq_Type.setText("DUT Acquire Mode:")
 
-        # Specifications
-        QLabel_V_Upper = QLabel()
-        QLabel_V_Lower = QLabel()
-        QLabel_Upper_Bound = QLabel()
-        QLabel_Lower_Bound = QLabel()
+        self.QLineEdit_OSC_DUT_Display_Channel = QComboBox()
+        self.QComboBox_Trigger_Source_Display_Channel = QComboBox()
 
-        QLabel_V_Upper.setText("Max Voltage (V):")
-        QLabel_V_Lower.setText("Min Voltage (V):")
-        QLabel_Upper_Bound.setText("Percentage of upper bound (%)")
-        QLabel_Lower_Bound.setText("Percentage of lower bound (%)")
+        self.QLineEdit_OSC_DUT_Display_Channel.addItems(["CHANNEL1", "CHANNEL2", "CHANNEL3", "CHANNEL4"])
+        self.QComboBox_Trigger_Source_Display_Channel.addItems(["CHANNEL1", "CHANNEL2", "CHANNEL3", "CHANNEL4"])
 
-        QLineEdit_V_Upper = QLineEdit()
-        QLineEdit_V_Lower = QLineEdit()
-        QLineEdit_Upper_Bound = QLineEdit()
-        QLineEdit_Lower_Bound = QLineEdit()
+        # External Auxiliary Equipment section
+        QLabel_External_Auxiliary_Equipment = QLabel()
+        QLabel_External_Auxiliary_Equipment.setText("Relay")
+        self.QComboBox_External_Auxiliary_Equipment = QComboBox()
+        self.QComboBox_External_Auxiliary_Equipment.addItems(["None", "RELAY"])
 
-        # Oscilloscope Settings
-        QLabel_Trigger_Mode = QLabel()
-        QLabel_Trigger_CouplingMode = QLabel()
-        QLabel_Trigger_SweepMode = QLabel()
-        QLabel_Trigger_SlopeMode = QLabel()
+        self.QComboBox_set_PSU_Channel = QComboBox()
+        self.QComboBox_set_ELoad_Channel = QComboBox()
+        self.QComboBox_Voltage_Sense = QComboBox()
+        self.QComboBox_set_Function = QComboBox()
+        self.QLineEdit_Power_Rating = QLineEdit()
+        self.QLineEdit_maxVoltage = QLineEdit()
+        self.QLineEdit_voltage_rated = QLineEdit()
+        self.QLineEdit_current_rated = QLineEdit()
+        self.QLineEdit_maxCurrent = QLineEdit()
 
-        QLabel_Trigger_Mode.setText("Trigger Mode:")
-        QLabel_Trigger_CouplingMode.setText("Coupling Mode (Trigger):")
-        QLabel_Trigger_SweepMode.setText("Trigger Sweep Mode:")
-        QLabel_Trigger_SlopeMode.setText("Trigger Slope Mode:")
+        self.QLineEdit_DUT_V_Settling_Band = QLineEdit()
+        self.QLineEdit_DUT_T_Settling_Band = QLineEdit()
+        self.QComboBox_DUT_Probe_Setting = QComboBox()
+        self.QComboBox_DUT_Acq_Type = QComboBox()
 
-        QComboBox_Trigger_Mode = QComboBox()
-        QComboBox_Trigger_CouplingMode = QComboBox()
-        QComboBox_Trigger_SweepMode = QComboBox()
-        QComboBox_Trigger_SlopeMode = QComboBox()
+        self.QComboBox_set_Function.addItems(
+            [
+                "Current Priority",
+                "Voltage Priority",
+                "Resistance Priority",
+            ]
+        )
+        self.QComboBox_set_Function.setEnabled(False)
+        self.QComboBox_Voltage_Sense.addItems(["2 Wire", "4 Wire"])
 
-        QComboBox_Trigger_Mode.addItems(["EDGE", "IIC", "EBUR"])
-        QComboBox_Trigger_CouplingMode.addItems(["DC", "AC"])
-        QComboBox_Trigger_SweepMode.addItems(["NORMAL", "AUTO"])
-        QComboBox_Trigger_SlopeMode.addItems(["ALT", "POS", "NEG", "EITH"])
+        self.QComboBox_set_PSU_Channel.addItems(["1", "2", "3", "4"])
+        self.QComboBox_set_PSU_Channel.setEnabled(True)
+        self.QComboBox_set_ELoad_Channel.addItems(["1", "2"])
+        self.QComboBox_set_ELoad_Channel.setEnabled(True)
 
-        QComboBox_Trigger_Mode.setEnabled(False)
-        QComboBox_Trigger_CouplingMode.setEnabled(False)
-        QComboBox_Trigger_SweepMode.setEnabled(False)
-        QComboBox_Trigger_SlopeMode.setEnabled(False)
+        self.QComboBox_DUT_Probe_Setting.addItems(["X1", "X10", "X20", "X100"])
+        self.QComboBox_DUT_Acq_Type.addItems(["NORMal", "PEAK", "AVERage", "HRESolution"])
 
-        layout1.addRow(Desp1)
-        layout1.addRow(QLabel_PSU_VisaAddress, QLineEdit_PSU_VisaAddress)
-        layout1.addRow(QLabel_OSC_VisaAddress, QLineEdit_OSC_VisaAddress)
+         # DUT Oscilloscope Settings
+        QLabel_DUT_Channel_Unit = QLabel()
+        QLabel_DUT_Channel_Offset = QLabel()
+        QLabel_DUT_Channel_CouplingMode = QLabel()
+        QLabel_DUT_Trigger_Mode = QLabel()
+        QLabel_DUT_Trigger_CouplingMode = QLabel()
+        QLabel_DUT_Trigger_SweepMode = QLabel()
+        QLabel_DUT_Trigger_SlopeMode = QLabel()
+        QLabel_DUT_TimeScale = QLabel()
+        QLabel_DUT_VerticalScale = QLabel()
 
-        layout1.addRow(Desp2)
-        layout1.addRow(QLabel_PSU_Display_Channel, QLineEdit_PSU_Display_Channel)
-        layout1.addRow(QLabel_OSC_Display_Channel, QLineEdit_OSC_Display_Channel)
-        layout1.addRow(QLabel_Voltage_Sense, QComboBox_Voltage_Sense)
+        QLabel_DUT_Channel_Unit.setText("Unit (DUT Channel)")
+        QLabel_DUT_Channel_Offset.setText("Offset (DUT Channel)")
+        QLabel_DUT_Channel_CouplingMode.setText("Coupling Mode (Channel)")
+        QLabel_DUT_Trigger_Mode.setText("Trigger Mode:")
+        QLabel_DUT_Trigger_CouplingMode.setText("Coupling Mode (Trigger):")
+        QLabel_DUT_Trigger_SweepMode.setText("Trigger Sweep Mode:")
+        QLabel_DUT_Trigger_SlopeMode.setText("Trigger Slope Mode:")
+        QLabel_DUT_TimeScale.setText("Time Scale:")
+        QLabel_DUT_VerticalScale.setText("Vertical Scale:(DUT(V))")
+        
+        self.QComboBox_DUT_Channel_Unit = QComboBox()
+        self.QLineEdit_DUT_Channel_Offset = QLineEdit()
+        self.QComboBox_DUT_Channel_CouplingMode = QComboBox()
+        self.QComboBox_DUT_Trigger_Mode = QComboBox()
+        self.QComboBox_DUT_Trigger_CouplingMode = QComboBox()
+        self.QComboBox_DUT_Trigger_SweepMode = QComboBox()
+        self.QComboBox_DUT_Trigger_SlopeMode = QComboBox()
+        self.QLineEdit_DUT_TimeScale = QLineEdit()
+        self.QLineEdit_DUT_VerticalScale = QLineEdit()
 
-        layout1.addRow(Desp3)
-        layout1.addRow(QLabel_V_Lower, QLineEdit_V_Lower)
-        layout1.addRow(QLabel_V_Upper, QLineEdit_V_Upper)
-        layout1.addRow(QLabel_Lower_Bound, QLineEdit_Lower_Bound)
-        layout1.addRow(QLabel_Upper_Bound, QLineEdit_Upper_Bound)
+        self.QComboBox_DUT_Channel_Unit.addItems(["VOLT", "AMPere"])
+        self.QComboBox_DUT_Channel_CouplingMode.addItems(["DC", "AC"])
+        self.QComboBox_DUT_Trigger_Mode.addItems(["EDGE", "IIC", "EBUR"])
+        self.QComboBox_DUT_Trigger_CouplingMode.addItems(["DC", "AC"])
+        self.QComboBox_DUT_Trigger_SweepMode.addItems(["NORMAL", "AUTO"])
+        self.QComboBox_DUT_Trigger_SlopeMode.addItems(["ALT", "POS", "NEG", "EITH"])
 
-        layout1.addRow(Desp4)
-        layout1.addRow(QLabel_Trigger_CouplingMode, QComboBox_Trigger_CouplingMode)
-        layout1.addRow(QLabel_Trigger_Mode, QComboBox_Trigger_Mode)
-        layout1.addRow(QLabel_Trigger_SweepMode, QComboBox_Trigger_SweepMode)
-        layout1.addRow(QLabel_Trigger_SlopeMode, QComboBox_Trigger_SlopeMode)
+        self.QComboBox_DUT_Channel_Unit.setEnabled(True)
+        self.QComboBox_DUT_Channel_CouplingMode.setEnabled(True)
+        self.QComboBox_DUT_Trigger_Mode.setEnabled(False)
+        self.QComboBox_DUT_Trigger_CouplingMode.setEnabled(False)
+        self.QComboBox_DUT_Trigger_SweepMode.setEnabled(False)
+        self.QComboBox_DUT_Trigger_SlopeMode.setEnabled(False)
+        self.QComboBox_DUT_Probe_Setting.setEnabled(True)
+        self.QComboBox_DUT_Acq_Type.setEnabled(False)
 
+        QLabel_Programming_Response_Up_NoLoad= QLabel()
+        QLabel_Programming_Response_Up_FullLoad= QLabel()
+        QLabel_Programming_Response_Down_NoLoad= QLabel()
+        QLabel_Programming_Response_Down_FullLoad= QLabel()
+
+        QLabel_Programming_Response_Up_NoLoad.setText("Programming Response Limit (Up-NoLoad)")
+        QLabel_Programming_Response_Up_FullLoad.setText("Programming Response Limit (Up-FullLoad)")
+        QLabel_Programming_Response_Down_NoLoad.setText("Programming Response Limit (Down-NoLoad)")
+        QLabel_Programming_Response_Down_FullLoad.setText("Programming Response Limit (Down-FullLoad)")
+
+        self.QLineEdit_Programming_Response_Up_NoLoad  = QLineEdit()
+        self.QLineEdit_Programming_Response_Up_FullLoad  = QLineEdit()
+        self.QLineEdit_Programming_Response_Down_NoLoad = QLineEdit()
+        self.QLineEdit_Programming_Response_Down_FullLoad = QLineEdit()
+      
+
+
+
+        # Create a horizontal layout for the "Save Path" and checkboxes
+        Rated_Power_Voltage_Current_Layout = QHBoxLayout()
+        Rated_Power_Voltage_Current_Layout.addWidget(QLabel_Power_Rating)  # QLabel for "Save Path"
+        Rated_Power_Voltage_Current_Layout.addWidget(self.QLineEdit_Power_Rating)  # Checkbox for "Generate Excel Report"
+        Rated_Power_Voltage_Current_Layout.addWidget(QLabel_voltage_rated)  # Checkbox for "Show Graph"
+        Rated_Power_Voltage_Current_Layout.addWidget(self.QLineEdit_voltage_rated)  # Checkbox for "Show Graph"
+        Rated_Power_Voltage_Current_Layout.addWidget(QLabel_current_rated)  # QLabel for "Save Path"
+        Rated_Power_Voltage_Current_Layout.addWidget(self.QLineEdit_current_rated)  # Checkbox for "Generate Excel Report"
+
+        Test_Voltage_Current_Layout = QHBoxLayout()
+        Test_Voltage_Current_Layout.addWidget(QLabel_maxVoltage)  # QLabel for "Save Path"
+        Test_Voltage_Current_Layout.addWidget(self.QLineEdit_maxVoltage)  # Checkbox for "Generate Excel Report"
+        Test_Voltage_Current_Layout.addWidget(QLabel_maxCurrent)  # Checkbox for "Show Graph"
+        Test_Voltage_Current_Layout.addWidget(self.QLineEdit_maxCurrent)  # Checkbox for "Show Graph"
+
+
+        Channel_CouplingMode_layout = QHBoxLayout()
+        Channel_CouplingMode_layout.addWidget(QLabel_DUT_Channel_CouplingMode)  # QLabel for "Save Path"
+        Channel_CouplingMode_layout.addWidget(self.QComboBox_DUT_Channel_CouplingMode)  # Checkbox for "Generate Excel Report"
+
+        Trigger_Mode_layout = QHBoxLayout()
+        Trigger_Mode_layout.addWidget(QLabel_DUT_Trigger_Mode)  # Checkbox for "Show Graph"
+        Trigger_Mode_layout.addWidget(self.QComboBox_DUT_Trigger_Mode)  # Checkbox for "Show Graph"
+
+        Unit_Channel_layout = QHBoxLayout()
+        Unit_Channel_layout.addWidget(QLabel_DUT_Channel_Unit)  # QLabel for "Save Path"
+        Unit_Channel_layout.addWidget(self.QComboBox_DUT_Channel_Unit)  # Checkbox for "Generate Excel Report"
+
+        Offset_Channel_layout = QHBoxLayout()
+        Offset_Channel_layout.addWidget(QLabel_DUT_Channel_Offset)  # Checkbox for "Show Graph"
+        Offset_Channel_layout.addWidget(self.QLineEdit_DUT_Channel_Offset)  # Checkbox for "Show Graph"
+
+        Trigger_CouplingMode_layout = QHBoxLayout()
+        Trigger_CouplingMode_layout.addWidget(QLabel_DUT_Trigger_CouplingMode)  # QLabel for "Save Path"
+        Trigger_CouplingMode_layout.addWidget(self.QComboBox_DUT_Trigger_CouplingMode)  # Checkbox for "Generate Excel Report"
+
+        Trigger_SweepMode_layout = QHBoxLayout()
+        Trigger_SweepMode_layout.addWidget(QLabel_DUT_Trigger_SweepMode)  # Checkbox for "Show Graph"  
+        Trigger_SweepMode_layout.addWidget(self.QComboBox_DUT_Trigger_SweepMode)  # Checkbox for "Show Graph"
+
+        Trigger_SlopeMode_layout = QHBoxLayout()
+        Trigger_SlopeMode_layout.addWidget(QLabel_DUT_Trigger_SlopeMode)  # QLabel for "Save Path"
+        Trigger_SlopeMode_layout.addWidget(self.QComboBox_DUT_Trigger_SlopeMode)  # Checkbox for "Generate Excel Report"
+
+        Probe_Setting_layout = QHBoxLayout()
+        Probe_Setting_layout.addWidget(QLabel_DUT_Probe_Setting)  # QLabel for "Save Path"
+        Probe_Setting_layout.addWidget(self.QComboBox_DUT_Probe_Setting)  # Checkbox for "Generate Excel Report"
+
+        TimeScale_layout = QHBoxLayout()
+        TimeScale_layout.addWidget(QLabel_DUT_TimeScale)  # Checkbox for "Show Graph"
+        TimeScale_layout.addWidget(self.QLineEdit_DUT_TimeScale)  # Checkbox for "Show Graph"
+
+        VerticalScale_layout = QHBoxLayout()
+        VerticalScale_layout.addWidget(QLabel_DUT_VerticalScale)  # QLabel for "Save Path"
+        VerticalScale_layout.addWidget(self.QLineEdit_DUT_VerticalScale)  # Checkbox for "Generate Excel Report"
+
+        Programming_Response_layout = QHBoxLayout()
+        Programming_Response_layout.addWidget(QLabel_Programming_Response_Up_NoLoad)
+        Programming_Response_layout.addWidget(self.QLineEdit_Programming_Response_Up_NoLoad)
+        Programming_Response_layout.addWidget(QLabel_Programming_Response_Up_FullLoad)
+        Programming_Response_layout.addWidget(self.QLineEdit_Programming_Response_Up_FullLoad)
+        Programming_Response_layout.addWidget(QLabel_Programming_Response_Down_NoLoad)
+        Programming_Response_layout.addWidget(self.QLineEdit_Programming_Response_Down_NoLoad)
+        Programming_Response_layout.addWidget(QLabel_Programming_Response_Down_FullLoad)
+        Programming_Response_layout.addWidget(self.QLineEdit_Programming_Response_Down_FullLoad)
+
+
+        layout1.addRow(Desp0)
+        layout1.addRow(QPushButton_Widget00)
         layout1.addRow(self.OutputBox)
+        layout1.addRow(QPushButton_Widget0)
+        layout1.addRow(Desp1)
+        layout1.addRow(QLabel_DUT, self.QComboBox_DUT)
+        layout1.addRow(QLabel_PSU_VisaAddress, self.QLineEdit_PSU_VisaAddress)
+        layout1.addRow(QLabel_OSC_VisaAddress, self.QLineEdit_OSC_VisaAddress)
+        layout1.addRow(QLabel_ELoad_VisaAddress, self.QLineEdit_ELoad_VisaAddress)
+        layout1.addRow(Desp2)
+        layout1.addRow(QLabel_set_Function, self.QComboBox_set_Function)
+        layout1.addRow(QLabel_Voltage_Sense, self.QComboBox_Voltage_Sense)
+        layout1.addRow(QLabel_set_PSU_Channel, self.QComboBox_set_PSU_Channel)
+        layout1.addRow(QLabel_set_ELoad_Channel, self.QComboBox_set_ELoad_Channel)
+        layout1.addRow(QLabel_OSC_DUT_Display_Channel, self.QLineEdit_OSC_DUT_Display_Channel)
+        layout1.addRow(QLabel_Trigger_Source_Display_Channel, self.QComboBox_Trigger_Source_Display_Channel)
+        layout1.addRow(Desp8)
+        layout1.addRow(QLabel_External_Auxiliary_Equipment, self.QComboBox_External_Auxiliary_Equipment)
+        layout1.addRow(Desp3)
+        layout1.addRow(Rated_Power_Voltage_Current_Layout)
+        layout1.addRow(Test_Voltage_Current_Layout)
+        layout1.addRow(Programming_Response_layout)
+        
+        layout1.addRow(Desp4)#DUT Oscilloscope Settings
+
+        layout1.addRow(Unit_Channel_layout)
+        layout1.addRow(Offset_Channel_layout)
+        layout1.addRow(Channel_CouplingMode_layout)
+        layout1.addRow(Trigger_Mode_layout)
+        layout1.addRow(Trigger_CouplingMode_layout)
+        layout1.addRow(Trigger_SweepMode_layout)
+        layout1.addRow(Trigger_SlopeMode_layout)
+        layout1.addRow(Probe_Setting_layout)
+        layout1.addRow(TimeScale_layout)
+        layout1.addRow(VerticalScale_layout)
+
         layout1.addRow(QPushButton_Widget)
         self.setLayout(layout1)
 
-        # Default Values
-        self.PSU = ""
-        self.OSC = ""
-        self.PSU_Channel = ""
-        self.OSC_Channel = ""
-        self.V_Upper = ""
-        self.V_Lower = ""
-        self.Upper_Bound = ""
-        self.Lower_Bound = ""
-        self.Trigger_CouplingMode = "DC"
-        self.Trigger_Mode = "EDGE"
-        self.Trigger_SweepMode = "NORMAL"
-        self.Trigger_SlopeMode = "EITH"
-        self.VoltageSense = "EXT"
+        QPushButton_Widget0.clicked.connect(self.doFind)
+        QPushButton_Widget.clicked.connect(self.executeTest)
+    
+        self.QLineEdit_PSU_VisaAddress.currentTextChanged.connect(self.PSU_VisaAddress_changed)
+        self.QLineEdit_OSC_VisaAddress.currentTextChanged.connect(self.OSC_VisaAddress_changed)
+        self.QLineEdit_ELoad_VisaAddress.currentTextChanged.connect(self.ELoad_VisaAddress_changed)
+        self.QComboBox_DUT.currentTextChanged.connect(self.on_current_index_changed)
+        self.QComboBox_set_PSU_Channel.currentTextChanged.connect(self.PSU_Channel_changed)
+        self.QComboBox_set_ELoad_Channel.currentTextChanged.connect(self.ELoad_Channel_changed)
+        self.QComboBox_External_Auxiliary_Equipment.currentTextChanged.connect(self.External_Auxiliary_Equipment_changed)
 
-        QLineEdit_PSU_VisaAddress.textEdited.connect(self.PSU_VisaAddress_changed)
-        QLineEdit_OSC_VisaAddress.textEdited.connect(self.OSC_VisaAddress_changed)
-        QLineEdit_PSU_Display_Channel.textEdited.connect(self.PSU_Channel_changed)
-        QLineEdit_OSC_Display_Channel.textEdited.connect(self.OSC_Channel_changed)
-        QComboBox_Voltage_Sense.currentTextChanged.connect(
+        self.QLineEdit_OSC_DUT_Display_Channel.currentTextChanged.connect(self.DUT_OSC_Channel_changed)
+        self.QComboBox_Trigger_Source_Display_Channel.currentTextChanged.connect(self.TriggerSource_changed)
+        
+        self.QLineEdit_Power_Rating.textEdited.connect(self.Power_Rating_changed)
+        self.QLineEdit_voltage_rated.textEdited.connect(self.Voltage_Rating_changed)
+        self.QLineEdit_current_rated.textEdited.connect(self.Current_Rating_changed)
+
+        self.QLineEdit_maxCurrent.textEdited.connect(self.maxCurrent_changed)
+        self.QLineEdit_maxVoltage.textEdited.connect(self.maxVoltage_changed)
+
+        self.QComboBox_set_Function.currentTextChanged.connect(self.set_Function_changed)
+
+        self.QComboBox_Voltage_Sense.currentTextChanged.connect(
             self.set_VoltageSense_changed
         )
-        QLineEdit_V_Upper.textEdited.connect(self.V_Upper_changed)
-        QLineEdit_V_Lower.textEdited.connect(self.V_Lower_changed)
-        QLineEdit_Upper_Bound.textEdited.connect(self.Upper_Bound_changed)
-        QLineEdit_Lower_Bound.textEdited.connect(self.Lower_Bound_changed)
-        QComboBox_Trigger_CouplingMode.currentTextChanged.connect(
-            self.Trigger_CouplingMode_changed
+        # Programming Response Settings
+        self.QLineEdit_Programming_Response_Up_NoLoad.textEdited.connect(self.Programming_Response_Up_NoLoad_changed)
+        self.QLineEdit_Programming_Response_Up_FullLoad.textEdited.connect(self.Programming_Response_Up_FullLoad_changed)
+        self.QLineEdit_Programming_Response_Down_NoLoad.textEdited.connect(self.Programming_Response_Down_NoLoad_changed)
+        self.QLineEdit_Programming_Response_Down_FullLoad.textEdited.connect(self.Programming_Response_Down_FullLoad_changed)
+
+        #DUT Oscilloscope Settings
+
+        self.QComboBox_DUT_Channel_Unit.currentTextChanged.connect(
+            self.DUT_Channel_Unit_changed
         )
-        QComboBox_Trigger_Mode.currentTextChanged.connect(self.Trigger_Mode_changed)
-        QComboBox_Trigger_SweepMode.currentTextChanged.connect(
-            self.Trigger_SweepMode_changed
+
+        self.QLineEdit_DUT_Channel_Offset.textEdited.connect(self.DUT_Channel_Offset_changed)
+
+        self.QComboBox_DUT_Channel_CouplingMode.currentTextChanged.connect(
+            self.DUT_Channel_CouplingMode_changed
         )
-        QComboBox_Trigger_SlopeMode.currentTextChanged.connect(
-            self.Trigger_SlopeMode_changed
+        self.QComboBox_DUT_Trigger_CouplingMode.currentTextChanged.connect(
+            self.DUT_Trigger_CouplingMode_changed
         )
-        QPushButton_Widget.clicked.connect(self.executeTest)
+        self.QComboBox_DUT_Trigger_Mode.currentTextChanged.connect(self.DUT_Trigger_Mode_changed)
+        self.QComboBox_DUT_Trigger_SweepMode.currentTextChanged.connect(
+            self.DUT_Trigger_SweepMode_changed
+        )
+        self.QComboBox_DUT_Trigger_SlopeMode.currentTextChanged.connect(
+            self.DUT_Trigger_SlopeMode_changed
+        )
+        self.QComboBox_DUT_Probe_Setting.currentTextChanged.connect(
+            self.DUT_Probe_Setting_changed
+        )
+        self.QComboBox_DUT_Acq_Type.currentTextChanged.connect(
+            self.DUT_Acq_Type_changed
+        )
+        self.QLineEdit_DUT_TimeScale.textEdited.connect(self.DUT_TimeScale_changed)
+
+        self.QLineEdit_DUT_VerticalScale.textEdited.connect(self.DUT_VerticalScale_changed)
+
+        QPushButton_Widget00.clicked.connect(self.savepath)
+    
+    def Programming_Response_Up_NoLoad_changed(self, s):
+        self.Programming_Response_Up_NoLoad = s
+
+    def Programming_Response_Up_FullLoad_changed(self, s):
+        self.Programming_Response_Up_FullLoad = s
+
+    def Programming_Response_Down_NoLoad_changed(self, s):
+        self.Programming_Response_Down_NoLoad = s
+
+    def Programming_Response_Down_FullLoad_changed(self, s):
+        self.Programming_Response_Down_FullLoad = s
+    
+    def External_Auxiliary_Equipment_changed(self, s):
+        if s == "None":
+            self.relay_voltage = "None"
+        else:
+            self.relay_voltage = "RELAY"
+
+    def on_current_index_changed(self):
+        selected_text = self.QComboBox_DUT.currentText()
+        self.update_selection(selected_text)
+        self.QLineEdit_PSU_VisaAddress.setCurrentText(self.PSU)
+        self.QLineEdit_OSC_VisaAddress.setCurrentText(self.OSC)
+        self.QLineEdit_ELoad_VisaAddress.setCurrentText(self.ELoad)
+        self.QComboBox_Voltage_Sense.setCurrentText("4 Wire" if self.VoltageSense == "EXT" else "2 Wire")
+        self.QComboBox_set_PSU_Channel.setCurrentIndex(int(self.PSU_Channel))
+        self.QComboBox_set_ELoad_Channel.setCurrentIndex(int(self.ELoad_Channel))
+        self.QLineEdit_OSC_DUT_Display_Channel.setCurrentText(self.DUT_OSC_Channel)
+        self.QComboBox_Trigger_Source_Display_Channel.setCurrentText(self.TriggerSource)
+        self.QComboBox_External_Auxiliary_Equipment.setCurrentText(self.relay_voltage)
+        self.QLineEdit_Power_Rating.setText(self.Power_Rating)
+        self.QLineEdit_voltage_rated.setText(self.Voltage_Rating)
+        self.QLineEdit_current_rated.setText(self.Current_Rating)
+        self.QLineEdit_maxVoltage.setText(self.maxVoltage)
+        self.QLineEdit_maxCurrent.setText(self.maxCurrent)
+        
+        self.QLineEdit_Programming_Response_Up_NoLoad.setText(self.Programming_Response_Up_NoLoad)
+        self.QLineEdit_Programming_Response_Up_FullLoad.setText(self.Programming_Response_Up_FullLoad)
+        self.QLineEdit_Programming_Response_Down_NoLoad.setText(self.Programming_Response_Down_NoLoad)
+        self.QLineEdit_Programming_Response_Down_FullLoad.setText(self.Programming_Response_Down_FullLoad)
+
+        self.QComboBox_DUT_Channel_Unit.setCurrentText(self.DUT_Channel_Unit)
+        self.QLineEdit_DUT_Channel_Offset.setText(self.DUT_Channel_Offset)
+        self.QComboBox_DUT_Channel_CouplingMode.setCurrentText(self.DUT_Channel_CouplingMode)
+        self.QComboBox_DUT_Trigger_Mode.setCurrentText(self.DUT_Trigger_Mode)
+        self.QComboBox_DUT_Trigger_CouplingMode.setCurrentText(self.DUT_Trigger_CouplingMode)
+        self.QComboBox_DUT_Trigger_SweepMode.setCurrentText(self.DUT_Trigger_SweepMode)
+        self.QComboBox_DUT_Trigger_SlopeMode.setCurrentText(self.DUT_Trigger_SlopeMode)
+        self.QComboBox_DUT_Probe_Setting.setCurrentText(self.DUT_Probe_Setting)
+        self.QComboBox_DUT_Acq_Type.setCurrentText(self.DUT_Acq_Type)
+        self.QLineEdit_DUT_TimeScale.setText(self.DUT_TimeScale)
+        self.QLineEdit_DUT_VerticalScale.setText(self.DUT_VerticalScale)
+
+
+    def update_selection(self, selected_text):
+        """Update selected text and reload config file"""
+        self.selected_text = selected_text
+        self.load_data()
+    
+    
+    def load_data(self):
+        """Reads configuration file and returns a dictionary of key-value pairs."""
+        config_data = {}
+        if self.selected_text =="Excavator":
+            self.config_file = os.path.join(config_folder,"config_Excavator.txt")
+            
+        elif self.selected_text =="Dolphin":
+            self.config_file = os.path.join(config_folder,"config_Dolphin.txt")
+            
+        elif self.selected_text =="SMU":
+            self.config_file = os.path.join(config_folder,"config_SMU.txt")
+
+        else:
+            self.config_file = os.path.join(config_folder,"config_Others.txt")
+
+        try:
+            with open(self.config_file, "r") as file: 
+                for line in file:
+
+                    if not line or line.startswith("#") or line.startswith("//"):
+                        continue 
+
+                    if "=" in line:
+                        key, value = line.strip().split("=")
+                        config_data[key.strip()] = value.strip()
+
+            for key, value in config_data.items():
+                if key == "savelocation":
+                    # If savelocation has a valid value, do not overwrite it
+                    if self.savelocation and self.savelocation != "C:/PyVisa - Copy  - Excavator - Copy/PyVisa/Test Data/File Export Testing":
+                        continue 
+                    else:
+                        setattr(self, key, value)
+                else:
+                    setattr(self, key, value)
+
+        except FileNotFoundError:
+            print("Config file not found. Using default values.")
+
+        return config_data
+
+
+    def DUT_changed(self, s):
+        self.DUT = s
+    
+    def DUT_Channel_Offset_changed(self, s):
+        self.DUT_Channel_Offset = s
+    
+    def CurrentTrigger_Channel_Offset_changed(self, s):
+        self.CurrentTrigger_Channel_Offset = s
+
+    def DUT_Channel_Unit_changed(self, s):
+        self.DUT_Channel_Unit = s
+    
+    def CurrentTrigger_Channel_Unit_changed(self, s):
+        self.CurrentTrigger_Channel_Unit = s
+
+    def TriggerSource_changed(self, s):
+        self.TriggerSource = s
+
+    def Voltage_Rating_changed(self, value):
+        self.Voltage_Rating = value
+    
+    def Current_Rating_changed(self, value):
+        self.Current_Rating = value
+
+    def doFind(self):
+        try:
+            self.QLineEdit_PSU_VisaAddress.clear()
+            self.QLineEdit_OSC_VisaAddress.clear()
+            self.QLineEdit_ELoad_VisaAddress.clear()
+
+            self.visaIdList, self.nameList, instrument_roles = NewGetVisaSCPIResources()
+
+            for i in range(len(self.nameList)):
+                self.OutputBox.append(str(self.nameList[i]) + str(self.visaIdList[i]))
+                self.QLineEdit_PSU_VisaAddress.addItems([str(self.visaIdList[i])])
+                self.QLineEdit_OSC_VisaAddress.addItems([str(self.visaIdList[i])])
+                self.QLineEdit_ELoad_VisaAddress.addItems([str(self.visaIdList[i])])
+
+            if 'PSU' in instrument_roles:
+                psu_index = self.visaIdList.index(instrument_roles['PSU'])
+                self.QLineEdit_PSU_VisaAddress.setCurrentIndex(psu_index)
+
+            if 'ELOAD' in instrument_roles:
+                eload_index = self.visaIdList.index(instrument_roles['ELOAD'])
+                self.QLineEdit_ELoad_VisaAddress.setCurrentIndex(eload_index)
+
+            if 'SCOPE' in instrument_roles:
+                osc_index = self.visaIdList.index(instrument_roles['SCOPE'])
+                self.QLineEdit_OSC_VisaAddress.setCurrentIndex(osc_index)
+            
+           
+        except:
+            self.OutputBox.append("No Devices Found!!!")
+        return   
+    
+    def PSU_VisaAddress_changed(self, s):
+        self.PSU = s
+
+    def OSC_VisaAddress_changed(self, s):
+        self.OSC = s
+
+    def ELoad_VisaAddress_changed(self, s):
+        self.ELoad = s
+    
+    def ELoad_Channel_changed(self, s):
+        self.ELoad_Channel = s
+
+    def PSU_Channel_changed(self, s):
+        self.PSU_Channel = s
+
+    def DUT_OSC_Channel_changed(self, s):
+        self.DUT_OSC_Channel = s
+
+    def Power_Rating_changed(self, s):
+        self.Power_Rating = s
+
+    def maxCurrent_changed(self, s):
+        self.maxCurrent = s
+
+    def maxVoltage_changed(self, s):
+        self.maxVoltage = s
+
+    def I_Step_changed(self, s):
+        self.I_Step = s
+
+#########################################################
+
+    def DUT_T_Settling_Band_changed(self, s):
+        self.DUT_T_Settling_Band = s
+
+    def DUT_V_Settling_Band_changed(self, s):
+        self.DUT_V_Settling_Band = s
+
+    def DUT_Channel_CouplingMode_changed(self, s):
+        self.DUT_Channel_CouplingMode = s
+
+    def DUT_Trigger_CouplingMode_changed(self, s):
+        self.DUT_Trigger_CouplingMode = s
+
+    def DUT_Trigger_Mode_changed(self, s):
+        self.DUT_Trigger_Mode = s
+
+    def DUT_Trigger_SweepMode_changed(self, s):
+        self.DUT_Trigger_SweepMode = s
+
+    def DUT_Trigger_SlopeMode_changed(self, s):
+        self.DUT_Trigger_SlopeMode = s
+    
+    def DUT_Probe_Setting_changed(self, s):
+        self.DUT_Probe_Setting = s
+    
+    def DUT_Acq_Type_changed(self, s):
+        self.DUT_Acq_Type = s
+
+    def DUT_TimeScale_changed(self, s):
+        self.DUT_TimeScale = s
+
+    def DUT_VerticalScale_changed(self, s):
+        self.DUT_VerticalScale = s
+
+
+
+    def set_Function_changed(self, s):
+        if s == "Voltage Priority":
+            self.setFunction = "Voltage"
+
+        elif s == "Current Priority":
+            self.setFunction = "Current"
+
+        elif s == "Resistance Priority":
+            self.setFunction = "Resistance"
+
+    def set_VoltageSense_changed(self, s):
+        if s == "2 Wire":
+            self.VoltageSense = "INT"
+        elif s == "4 Wire":
+            self.VoltageSense = "EXT"
+
+    def savepath(self):  
+        # Create a Tkinter root window
+        root = Tk()
+        root.withdraw()  # Hide the root window
+
+        # Open a directory dialog and return the selected directory path
+        directory = filedialog.askdirectory()
+        self.savelocation = directory
+        self.OutputBox.append(str(self.savelocation))
+
 
     def executeTest(self):
         """The method begins by compiling all the parameters in a dictionary for ease of storage and calling,
@@ -5139,20 +5667,39 @@ class ProgrammingSpeed(QDialog):
 
         """
         dict = dictGenerator.input(
+            savedir=self.savelocation,
             Instrument="Keysight",
             PSU=self.PSU,
             OSC=self.OSC,
+            ELoad=self.ELoad,
+            V_Rating=self.Voltage_Rating,
+            I_Rating=self.Current_Rating,
+            P_Rating=self.Power_Rating,
+            power=self.Power_Rating,
+            maxCurrent=self.maxCurrent,
+            maxVoltage=self.maxVoltage,
+            ELoad_Channel=self.ELoad_Channel,
             PSU_Channel=self.PSU_Channel,
-            OSC_Channel=self.OSC_Channel,
+            DUT_OSC_Channel=self.DUT_OSC_Channel,
+            TriggerSource=self.TriggerSource,
             VoltageSense=self.VoltageSense,
-            Trigger_Mode=self.Trigger_Mode,
-            Trigger_CouplingMode=self.Trigger_CouplingMode,
-            Trigger_SweepMode=self.Trigger_SweepMode,
-            Trigger_SlopeMode=self.Trigger_SlopeMode,
-            Upper_Bound=self.Upper_Bound,
-            Lower_Bound=self.Lower_Bound,
-            V_Upper=self.V_Upper,
-            V_Lower=self.V_Lower,
+            setFunction=self.setFunction,
+            DUT_Channel_Unit=self.DUT_Channel_Unit,
+            DUT_Channel_Offset=self.DUT_Channel_Offset,
+            DUT_Channel_CouplingMode=self.DUT_Channel_CouplingMode,
+            DUT_Trigger_Mode=self.DUT_Trigger_Mode,
+            DUT_Trigger_CouplingMode=self.DUT_Trigger_CouplingMode,
+            DUT_Trigger_SweepMode=self.DUT_Trigger_SweepMode,
+            DUT_Trigger_SlopeMode=self.DUT_Trigger_SlopeMode,
+            DUT_Probe_Setting=self.DUT_Probe_Setting,
+            DUT_Acq_Type=self.DUT_Acq_Type,
+            DUT_TimeScale=self.DUT_TimeScale,
+            DUT_VerticalScale=self.DUT_VerticalScale,
+            Response_Up_NoLoad=self.Programming_Response_Up_NoLoad,
+            Response_Up_FullLoad=self.Programming_Response_Up_FullLoad,
+            Response_Down_NoLoad=self.Programming_Response_Down_NoLoad,
+            Response_Down_FullLoad=self.Programming_Response_Down_FullLoad,
+            updatedelay = self.updatedelay,
         )
         QMessageBox.warning(
             self,
@@ -5160,77 +5707,18 @@ class ProgrammingSpeed(QDialog):
             "Measurement will start now , please do not close the main window until test is completed",
         )
 
-        for i in [dict]:
-            if i == "":
-                QMessageBox.warning(
-                    self, "Error", "One of the parameters are not filled in"
-                )
-                break
 
-        else:
-            A = VisaResourceManager()
-            flag, args = A.openRM(self.PSU, self.OSC)
-
-            if flag == 0:
-                string = ""
-                for item in args:
-                    string = string + item
-
-                QMessageBox.warning(self, "VISA IO ERROR", string)
-                exit()
-
-            try:
-               # ProgrammingSpeedTest.execute(self, dict)
-                pass
-            except Exception as e:
-                print(e)
-                QMessageBox.warning(self, "Error", str(e))
-                exit()
+        try:
+            DolphinProgrammingResponse.execute(self, dict)
+        
+        except Exception as e:
+            print(e)
+            QMessageBox.warning(self, "Error", str(e))
+            exit()
 
         self.OutputBox.append(my_result.getvalue())
         self.OutputBox.append("Measurement is complete !")
 
-    def V_Upper_changed(self, s):
-        self.V_Upper = s
-
-    def V_Lower_changed(self, s):
-        self.V_Lower = s
-
-    def Upper_Bound_changed(self, s):
-        self.Upper_Bound = s
-
-    def Lower_Bound_changed(self, s):
-        self.Lower_Bound = s
-
-    def Trigger_CouplingMode_changed(self, s):
-        self.Trigger_CouplingMode = s
-
-    def Trigger_Mode_changed(self, s):
-        self.Trigger_Mode = s
-
-    def Trigger_SweepMode_changed(self, s):
-        self.Trigger_SweepMode = s
-
-    def Trigger_SlopeMode_changed(self, s):
-        self.Trigger_SlopeMode = s
-
-    def set_VoltageSense_changed(self, s):
-        if s == "2 Wire":
-            self.VoltageSense = "INT"
-        elif s == "4 Wire":
-            self.VoltageSense = "EXT"
-
-    def PSU_VisaAddress_changed(self, s):
-        self.PSU = s
-
-    def OSC_VisaAddress_changed(self, s):
-        self.OSC = s
-
-    def PSU_Channel_changed(self, s):
-        self.PSU_Channel = s
-
-    def OSC_Channel_changed(self, s):
-        self.OSC_Channel = s
 
 class PowerMeasurementDialog(QDialog):
     """Class for configuring the voltage measurement DUT Tests Dialog.
