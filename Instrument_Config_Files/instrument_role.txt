@@ -1,8 +1,12 @@
 //Power Supply Instrument
 E36441A: PSU
+LINUXGEN: PSU
+Hornbill: PSU
 
 //Electronics Load Instrument 
 EL33133A: ELOAD
+EL34243A:ELOAD
+
 
 //Digital Multimeter
 34461A: DMM2

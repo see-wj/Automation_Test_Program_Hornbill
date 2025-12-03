@@ -41,8 +41,7 @@ from DUT_Test_Scripts.DUT_Test import (
 from DUT_Test_Scripts.DUT_screenshot import ScreenShotDialog
 
 
-from DUT_Test_Scripts.Hornbill_DUT_Test_With_ELoad import (
-    HornbillVoltageMeasurementwithELoad,)
+from DUT_Test_Scripts.Hornbill_DUT_Test_With_ELoad import*
 
 from DUT_Test_Scripts.Hornbill_DUT_Test_No_ELoad import (
     HornbillVoltageMeasurementNoELoad,)
@@ -64,9 +63,20 @@ from xlreport import *
 from xlreportpower import*
 
 from External_Auxiliary_Equipment.Relay_Control import *
-
+x=0
 desp_font = QFont("Times New Roman", 14, QFont.Bold) 
 AdvancedSettingsList = []
+
+
+def run_tabulated_excel_file(output_file, state, wb=None):
+ 
+    if state == "open":
+        wb = load_workbook(output_file)
+        ws = wb["Data"]
+   
+        return wb,ws
+    elif state == "close":
+        wb.save(output_file)
 
 #############################################################################
 def show_error_dialog(parent, e, traceback_str=None):
@@ -343,7 +353,8 @@ class MainWindow(QMainWindow):
             ("Power Measurement", "Comprehensive power measurement dialog"),
             ("Bundle Measurement - Voltage", "Specialized bundle voltage measurement"),
             ("Bundle Measurement - Current/Power", "Bundle current and power measurement"),
-            ("AC Source Settings", "Simple Configuration of AC Source")
+            ("AC Source Settings", "Simple Configuration of AC Source"),
+            ("Voltage Calibration", "Voltage Calibration Dialog"),
         ]
 
         #Add qdialog to be opened when test list selected
@@ -358,7 +369,8 @@ class MainWindow(QMainWindow):
             "Power Measurement Dialog",
             "Bundle Measurement Voltage Dialog",
             "Bundle Measurement Current/Power Dialog",
-            "AC Source Setting Dialog"
+            "AC Source Setting Dialog",
+            "Voltage Calibration Dialog",
         ]
         
         #Show the tab on the Main Window
@@ -420,7 +432,7 @@ class MainWindow(QMainWindow):
         self.tab_widget.addTab(self.tab_TestList, "Test Selection")
 
         # Set larger font for tab labels
-        tab_font = QFont("Arial", 14)
+        tab_font = QFont("Arial", 16)
         self.tab_widget.setFont(tab_font)
 
         # Initialize UI for each tab
@@ -492,13 +504,13 @@ class MainWindow(QMainWindow):
         
         # Description label
         desc_label = QLabel("Select from the list below to open different test dialogs:")
-        desc_label.setFont(QFont("Arial", 12))
+        desc_label.setFont(QFont("Arial", 16))
         desc_label.setAlignment(Qt.AlignCenter)
         desc_label.setStyleSheet("color: #34495e; margin: 5px;")
         
         # Create list widget
         self.test_list = QListWidget()
-        self.test_list.setFont(QFont("Arial", 11))
+        self.test_list.setFont(QFont("Arial", 16))
         self.test_list.setStyleSheet("""
             QListWidget {
                 border: 2px solid #bdc3c7;
@@ -530,7 +542,7 @@ class MainWindow(QMainWindow):
         
         # Add select button
         select_btn = QPushButton("Open Selected Test")
-        select_btn.setFont(QFont("Arial", 12, QFont.Bold))
+        select_btn.setFont(QFont("Arial", 16, QFont.Bold))
         select_btn.setStyleSheet("""
             QPushButton {
                 background-color: #3498db;
@@ -595,7 +607,7 @@ class MainWindow(QMainWindow):
     def open_test_by_index(self, index):
         """Open dialog based on index - placeholder for actual dialog implementations"""
 
-        if 0 <= index < 13:
+        if 0 <= index < 14:
 
             # Handle different dialog types based on index
             if index == 0:  # Bundle Test
@@ -637,6 +649,9 @@ class MainWindow(QMainWindow):
             elif index == 12:  # AC Source Dialog
                 self.ac_source_dialog = ACSourceSetting(self.params)
                 self.ac_source_dialog.show()
+            elif index == 13:  # Voltage Calibration Dialog
+                self.voltage_calibration_dialog = VoltageCalibrationDialog()
+                self.voltage_calibration_dialog.show()
         else:
             print(f"Invalid dialog index: {index}")
 
@@ -710,7 +725,7 @@ class VoltageMeasurementDialog(QDialog):
         self.checkbox_test_TransientRecovery = 2
 
         self.Range = "Auto"
-        self.Aperture = "0.2"
+        self.Aperture = "MAX"
         self.AutoZero = "ON"
         self.inputZ = "ON"
         self.UpTime = "50"
@@ -729,13 +744,23 @@ class VoltageMeasurementDialog(QDialog):
         self.Probe_Setting = "X10"
         self.Acq_Type = "AVERage"
 
+        self.simulation_mode = 0
+        self.output_file = r"C:\Users\shamlee3\OneDrive - Keysight Technologies\Wei Jing See's files - Shamman Xian Jun Lee\Test Data\Monk Data_Voltage Accuracy.xlsx"  
+        self.selected_text  = "Hornbill"
+        self.stop_requested = False
+
         self.checkbox_SpecialCase = 2
         self.checkbox_NormalCase = 2
+        self.checkbox_Voltage_Accuracy_Voltage_Mode = 2
+        self.checkbox_Voltage_Accuracy_Current_Mode = 0
         
         #Create Voltage Window
         self.setWindowTitle("Voltage Measurement")
         self.image_window = None
         self.setWindowFlags(Qt.Window)
+        font = QFont()
+        font.setPointSize(16)   # Adjust size here
+        self.setFont(font)
 
         #Create find button 
         QPushButton_Widget0 = QPushButton()
@@ -748,6 +773,8 @@ class VoltageMeasurementDialog(QDialog):
         QPushButton_Widget3.setText("Estimate Data Collection Time")
         QPushButton_Widget4 = QPushButton()
         QPushButton_Widget4.setText("Find Instruments")
+        QPushButton_Widget5 = QPushButton()
+        QPushButton_Widget5.setText("Stop Test")
         self.QCheckBox_Report_Widget = QCheckBox()
         self.QCheckBox_Report_Widget.setText("Generate Excel Report")
         self.QCheckBox_Report_Widget.setCheckState(Qt.Checked)
@@ -756,6 +783,19 @@ class VoltageMeasurementDialog(QDialog):
         self.QCheckBox_Image_Widget.setCheckState(Qt.Checked)
         QCheckBox_Lock_Widget = QCheckBox()
         QCheckBox_Lock_Widget.setText("Lock Widget")
+
+        self.QCheckBox_Voltage_Accuracy_Voltage_Mode_Widget = QCheckBox()
+        self.QCheckBox_Voltage_Accuracy_Voltage_Mode_Widget.setText("Current Static (Voltage Change)")
+        self.QCheckBox_Voltage_Accuracy_Voltage_Mode_Widget.setCheckState(Qt.Checked)
+        
+        self.QCheckBox_Voltage_Accuracy_Current_Mode_Widget = QCheckBox()
+        self.QCheckBox_Voltage_Accuracy_Current_Mode_Widget.setText("Current Change(Load Change)")
+        self.QCheckBox_Voltage_Accuracy_Current_Mode_Widget.setCheckState(Qt.Unchecked)
+
+        self.QCheckbox_Simulation_Mode = QCheckBox()
+        self.QCheckbox_Simulation_Mode.setText("Simulation Mode")
+        self.QCheckbox_Simulation_Mode.setCheckState(Qt.Unchecked)
+        
 
         #Output Display
         self.OutputBox = QTextBrowser()
@@ -798,6 +838,16 @@ class VoltageMeasurementDialog(QDialog):
         QLabel_Save_Path.setFont(desp_font)
         QLabel_Save_Path.setText("Drive Location/Output Wndow:")
 
+        #Voltage Accuracy Mode
+        QLabel_Voltage_Accuracy_Mode = QLabel()
+        QLabel_Voltage_Accuracy_Mode.setFont(desp_font)
+        QLabel_Voltage_Accuracy_Mode.setText("Voltage Accuracy Test Mode Selection:")
+
+        #Simulation Mode
+        QLabel_Simulation_Mode =QLabel()    
+        QLabel_Simulation_Mode.setFont(desp_font)
+        QLabel_Simulation_Mode.setText("Enable Simulation Mode (No Instruments Connected):")
+
         # Connections section
         QLabel_PSU_VisaAddress = QLabel()
         QLabel_DMM_VisaAddress = QLabel()
@@ -808,7 +858,7 @@ class VoltageMeasurementDialog(QDialog):
         QLabel_DMM_VisaAddress.setText("Visa Address (DMM):")
         QLabel_ELoad_VisaAddress.setText("Visa Address (ELoad):")
         QLabel_DMM_Instrument.setText("Instrument Type (DMM):")
-        QLabel_DUT.setText("DUT:")
+        QLabel_DUT.setText("DUT Test Profile:")
 
         self.QLineEdit_PSU_VisaAddress = QComboBox()
         self.QLineEdit_DMM_VisaAddress = QComboBox()
@@ -868,7 +918,7 @@ class VoltageMeasurementDialog(QDialog):
             ]
         )
         self.QComboBox_set_Function.setEnabled(False)
-        self.QComboBox_set_PSU_Channel.addItems(["1", "2", "3", "4"])
+        self.QComboBox_set_PSU_Channel.addItems(["None", "1", "2", "3", "4"])
         self.QComboBox_set_PSU_Channel.setEnabled(True)
         self.QComboBox_set_ELoad_Channel.addItems(["None", "1", "2"])
         self.QComboBox_set_ELoad_Channel.setEnabled(True)
@@ -933,7 +983,8 @@ class VoltageMeasurementDialog(QDialog):
 
         exec_layout.addRow(QPushButton_Widget3)
         exec_layout.addRow(QPushButton_Widget2)
-        exec_layout.addRow(QPushButton_Widget1)   
+        exec_layout.addRow(QPushButton_Widget1)
+        exec_layout.addRow(QPushButton_Widget5)   
 
         exec_layout_box.addLayout(exec_layout)
  
@@ -945,8 +996,12 @@ class VoltageMeasurementDialog(QDialog):
         setting_layout = QFormLayout()
 
         setting_layout.addRow(Desp1)
-        setting_layout.addRow(QPushButton_Widget4)
+        setting_layout.addRow(self.QCheckbox_Simulation_Mode)
         setting_layout.addRow(QLabel_DUT, self.QComboBox_DUT)
+        setting_layout.addRow(QLabel_Voltage_Accuracy_Mode)
+        setting_layout.addRow(self.QCheckBox_Voltage_Accuracy_Voltage_Mode_Widget)
+        setting_layout.addRow(self.QCheckBox_Voltage_Accuracy_Current_Mode_Widget)
+        setting_layout.addRow(QPushButton_Widget4)
         setting_layout.addRow(QLabel_PSU_VisaAddress, self.QLineEdit_PSU_VisaAddress)
         setting_layout.addRow(QLabel_DMM_VisaAddress, self.QLineEdit_DMM_VisaAddress)
         setting_layout.addRow(QLabel_ELoad_VisaAddress, self.QLineEdit_ELoad_VisaAddress)
@@ -985,9 +1040,14 @@ class VoltageMeasurementDialog(QDialog):
         self.setLayout(Main_Layout)
         scroll_area(self,Main_Layout)
 
+        self.QCheckbox_Simulation_Mode.stateChanged.connect(self.simulation_mode_changed)   
+
         self.QLineEdit_PSU_VisaAddress.currentTextChanged.connect(self.PSU_VisaAddress_changed)
         self.QLineEdit_DMM_VisaAddress.currentTextChanged.connect(self.DMM_VisaAddress_changed)
         self.QLineEdit_ELoad_VisaAddress.currentTextChanged.connect(self.ELoad_VisaAddress_changed)
+
+        self.QCheckBox_Voltage_Accuracy_Voltage_Mode_Widget.stateChanged.connect(self.checkbox_state_Voltage_Accuracy_Voltage_Mode)
+        self.QCheckBox_Voltage_Accuracy_Current_Mode_Widget.stateChanged.connect(self.checkbox_state_Voltage_Accuracy_Current_Mode)
         
         self.QComboBox_DUT.currentTextChanged.connect(self.DUT_changed)
         self.QLineEdit_Programming_Error_Gain.textEdited.connect(self.Programming_Error_Gain_changed)
@@ -1032,6 +1092,24 @@ class VoltageMeasurementDialog(QDialog):
         AdvancedSettingsList.append(self.inputZ)
         AdvancedSettingsList.append(self.UpTime)
         AdvancedSettingsList.append(self.DownTime)
+    
+    def simulation_mode_changed(self, state):
+        if state == Qt.Checked:
+            self.simulation_mode = 2
+        else:
+            self.simulation_mode = 0
+    
+    def checkbox_state_Voltage_Accuracy_Voltage_Mode(self, state):
+        if state == Qt.Checked:
+            self.checkbox_Voltage_Accuracy_Voltage_Mode = 2
+        else:
+            self.checkbox_Voltage_Accuracy_Voltage_Mode = 0
+
+    def checkbox_state_Voltage_Accuracy_Current_Mode(self, state):
+        if state == Qt.Checked:
+            self.checkbox_Voltage_Accuracy_Current_Mode = 2
+        else:
+            self.checkbox_Voltage_Accuracy_Current_Mode = 0
 
     def External_Auxiliary_Equipment_changed(self, s):
         if s == "None":
@@ -1057,6 +1135,9 @@ class VoltageMeasurementDialog(QDialog):
         self.QLineEdit_maxCurrent.setText(self.maxCurrent)
         self.QLineEdit_current_stepsize.setText(self.current_step_size)
 
+        channel_str = str(self.PSU_Channel)
+        index = self.QComboBox_set_PSU_Channel.findText(channel_str)
+        self.QComboBox_set_PSU_Channel.setCurrentIndex(index)
         self.QComboBox_set_PSU_Channel.setCurrentIndex(int(self.PSU_Channel))
         self.QComboBox_set_ELoad_Channel.setCurrentIndex(int(self.ELoad_Channel))
         self.QComboBox_Voltage_Sense.setCurrentText("4 Wire" if self.VoltageSense == "EXT" else "2 Wire")
@@ -1068,8 +1149,8 @@ class VoltageMeasurementDialog(QDialog):
         self.selected_text = selected_text
         self.load_data()
 
-    def load_data(self):
-        """Reads configuration file and returns a dictionary of key-value pairs."""
+    """def load_data(self):
+        Reads configuration file and returns a dictionary of key-value pairs.
         config_data = {}
         if self.selected_text =="Excavator":
             self.config_file = os.path.join(config_folder,"config_Excavator.txt")
@@ -1082,7 +1163,6 @@ class VoltageMeasurementDialog(QDialog):
         
         elif self.selected_text =="Hornbill":
             self.config_file = os.path.join(config_folder,"config_Hornbill.txt")
-
         else:
             self.config_file = os.path.join(config_folder,"config_Others.txt")
 
@@ -1110,7 +1190,58 @@ class VoltageMeasurementDialog(QDialog):
         except FileNotFoundError:
             print("Config file not found. Using default values.")
 
+        return config_data"""
+    
+
+    def load_data(self):
+        """Reads configuration file and returns a dictionary of key-value pairs."""
+        config_data = {}
+
+        # Determine base folder for configs
+        if getattr(sys, "frozen", False):
+            # Running as PyInstaller exe
+            exe_folder = Path(sys.executable).parent
+            # Configs should be in Executable/Instrument_Config_Files
+            config_base = exe_folder / "Instrument_Config_Files"
+        else:
+            # Running as normal Python script
+            project_root = Path(__file__).resolve().parent.parent  # <-- go up one level from src
+            config_base = project_root / "Instrument_Config_Files"
+
+        # Map selected_text to config filename
+        file_map = {
+            "Excavator": "config_Excavator.txt",
+            "Dolphin": "config_Dolphin.txt",
+            "SMU": "config_SMU.txt",
+            "Hornbill": "config_Hornbill.txt"
+        }
+        config_filename = file_map.get(self.selected_text, "config_Others.txt")
+        self.config_file = config_base / config_filename
+
+        try:
+            with open(self.config_file, "r") as file:
+                for line in file:
+                    line = line.strip()
+                    if not line or line.startswith("#") or line.startswith("//"):
+                        continue
+                    if "=" in line:
+                        key, value = line.split("=", 1)
+                        config_data[key.strip()] = value.strip()
+
+            for key, value in config_data.items():
+                if key == "savelocation":
+                    if self.savelocation and self.savelocation != "C:/PyVisa - Copy  - Excavator - Copy/PyVisa/Test Data/File Export Testing":
+                        continue
+                    else:
+                        setattr(self, key, value)
+                else:
+                    setattr(self, key, value)
+
+        except FileNotFoundError:
+            print(f"⚠️ Config file not found: {self.config_file}. Using default values.")
+
         return config_data
+    
     def Power_changed(self, value):
         self.Power = value
 
@@ -1120,18 +1251,31 @@ class VoltageMeasurementDialog(QDialog):
             self.QLineEdit_DMM_VisaAddress.clear()
             self.QLineEdit_ELoad_VisaAddress.clear()
             
-            self.visaIdList, self.nameList = GetVisaSCPIResources()
+            self.visaIdList, self.nameList, instrument_roles = NewGetVisaSCPIResources()
             
             for i in range(len(self.nameList)):
                 self.OutputBox.append(str(self.nameList[i]) + str(self.visaIdList[i]))
                 self.QLineEdit_PSU_VisaAddress.addItems([str(self.visaIdList[i])])
                 self.QLineEdit_DMM_VisaAddress.addItems([str(self.visaIdList[i])])
                 self.QLineEdit_ELoad_VisaAddress.addItems([str(self.visaIdList[i])])
+
+            if 'PSU' in instrument_roles:
+                psu_index = self.visaIdList.index(instrument_roles['PSU'])
+                self.QLineEdit_PSU_VisaAddress.setCurrentIndex(psu_index)
+
+            if 'ELOAD' in instrument_roles:
+                eload_index = self.visaIdList.index(instrument_roles['ELOAD'])
+                self.QLineEdit_ELoad_VisaAddress.setCurrentIndex(eload_index)
+
+            if 'DMM' in instrument_roles:
+                dmm_index = self.visaIdList.index(instrument_roles['DMM'])
+                self.QLineEdit_DMM_VisaAddress.setCurrentIndex(dmm_index)
             
             # Add "None" option at the end
-            self.QLineEdit_PSU_VisaAddress.addItem("None")
+            self.QLineEdit_PSU_VisaAddress.addItem("TCPIP0::141.183.188.184::5025::SOCKET")
             self.QLineEdit_DMM_VisaAddress.addItem("None")
             self.QLineEdit_ELoad_VisaAddress.addItem("None")
+            self.QLineEdit_PSU_VisaAddress.addItem("TCPIP0::141.183.188.184::inst0::INSTR")
                     
         except:
             self.OutputBox.append("No Devices Found!!!")
@@ -1294,6 +1438,7 @@ class VoltageMeasurementDialog(QDialog):
         try:
             for x in range (int(self.noofloop)):
 
+
                 """The method begins by compiling all the parameters in a dictionary for ease of storage and calling,
                 then the parameters are looped through to check if any of them are empty or return NULL, a warning dialogue
                 will appear if the statement is true, and the users have to troubleshoot the issue. After so, the tests will
@@ -1303,215 +1448,235 @@ class VoltageMeasurementDialog(QDialog):
                 optionally export all the details into a CSV file or display a graph after the test is completed.
 
                 """
-            self.infoList = []
-            self.dataList = []
-            self.dataList2 = []
-            self.setEnabled(False)
-
-            dict = dictGenerator.input(
-                V_Rating=self.Voltage_Rating,
-                power=self.Power,
-                estimatetime=self.estimatetime,
-                updatedelay=self.updatedelay,
-                readbackvoltage=self.readbackvoltage,
-                readbackcurrent=self.readbackcurrent,
-                noofloop=self.noofloop,
-                Instrument=self.DMM_Instrument,
-                Programming_Error_Gain=self.Programming_Error_Gain,
-                Programming_Error_Offset=self.Programming_Error_Offset,
-                Readback_Error_Gain=self.Readback_Error_Gain,
-                Readback_Error_Offset=self.Readback_Error_Offset,
-                relay_voltage=self.relay_voltage,
-                unit=self.unit,
-                minCurrent=self.minCurrent,
-                maxCurrent=self.maxCurrent,
-                current_step_size=self.current_step_size,
-                minVoltage=self.minVoltage,
-                maxVoltage=self.maxVoltage,
-                voltage_step_size=self.voltage_step_size,
-                selected_DUT=self.selected_text,
-                PSU=self.PSU,
-                OperationMode=self.SPOperationMode,
-                OSC=self.OSC,
-                DMM=self.DMM,
-                ELoad=self.ELoad,
-                ELoad_Channel=self.ELoad_Channel,
-                PSU_Channel=self.PSU_Channel,
-                VoltageSense=self.VoltageSense,
-                VoltageRes=self.VoltageRes,
-                setFunction=self.setFunction,
-                Range=AdvancedSettingsList[0],
-                Aperture=AdvancedSettingsList[1],
-                AutoZero=AdvancedSettingsList[2],
-                InputZ=AdvancedSettingsList[3],
-                UpTime=AdvancedSettingsList[4],
-                DownTime=AdvancedSettingsList[5],
-            )
-
-            # Check for missing parameters
-            missing = self.check_missing_params(dict)
-            if missing:
-                print(f"The following parameters are missing or empty: {missing}")
-                return
-
-            """# Visa Address Check & Run Test
-            A = VisaResourceManager()
-
-            # Collect only valid addresses
-            addresses = [addr for addr in [self.ELoad, self.PSU, self.DMM] if addr not in (None, "None")]
-
-            # Optional: keep only USB addresses
-            addresses = [addr for addr in addresses if str(addr).upper().startswith("USB")]
-
-            if not addresses:
-                self.OutputBox.append("No valid VISA addresses selected.")
-                return
-
-            flag, args = A.openRM(*addresses)
-            if flag == 0:
-                string = ", ".join(map(str, args))
-                QMessageBox.warning(self, "VISA IO ERROR", string)
-                return
-            """
-            QMessageBox.warning(
-            self,
-            "In Progress",
-            "Measurement will start now , please do not close the main window until test is completed",
-                                )
-            # globalvv = dict["estimatetime"]
-            # loading_thread = threading.Thread(target=self.tkinter_loading_screen, args=(globalvv,))
-            # loading_thread.start()
-
-            #Execute Voltage Measurement
-            relay_voltage = RelayController_Voltage()
-            if self.relay_voltage == "RELAY":
                 
-                relay_voltage.relay_on()
-            else:
-                relay_voltage.relay_off()
+                self.infoList = []
+                self.dataList = []
+                self.dataList2 = []
+                self.setEnabled(False)
 
-            if self.DMM_Instrument == "Keysight":
+                dict = dictGenerator.input(
+                    V_Rating=self.Voltage_Rating,
+                    power=self.Power,
+                    estimatetime=self.estimatetime,
+                    updatedelay=self.updatedelay,
+                    readbackvoltage=self.readbackvoltage,
+                    readbackcurrent=self.readbackcurrent,
+                    noofloop=self.noofloop,
+                    Instrument=self.DMM_Instrument,
+                    Programming_Error_Gain=self.Programming_Error_Gain,
+                    Programming_Error_Offset=self.Programming_Error_Offset,
+                    Readback_Error_Gain=self.Readback_Error_Gain,
+                    Readback_Error_Offset=self.Readback_Error_Offset,
+                    relay_voltage=self.relay_voltage,
+                    unit=self.unit,
+                    minCurrent=self.minCurrent,
+                    maxCurrent=self.maxCurrent,
+                    current_step_size=self.current_step_size,
+                    minVoltage=self.minVoltage,
+                    maxVoltage=self.maxVoltage,
+                    voltage_step_size=self.voltage_step_size,
+                    selected_DUT=self.selected_text,
+                    PSU=self.PSU,
+                    OperationMode=self.SPOperationMode,
+                    OSC=self.OSC,
+                    DMM=self.DMM,
+                    ELoad=self.ELoad,
+                    ELoad_Channel=self.ELoad_Channel,
+                    PSU_Channel=self.PSU_Channel,
+                    VoltageSense=self.VoltageSense,
+                    VoltageRes=self.VoltageRes,
+                    setFunction=self.setFunction,
+                    Range=AdvancedSettingsList[0],
+                    Aperture=AdvancedSettingsList[1],
+                    AutoZero=AdvancedSettingsList[2],
+                    InputZ=AdvancedSettingsList[3],
+                    UpTime=AdvancedSettingsList[4],
+                    DownTime=AdvancedSettingsList[5],
+                )
 
-                if self.selected_text == "Dolphin":
-                    if self.ELoad != "None" and self.DMM != "None":
-                        print("ELoad connected and DMM connected") #All connected
-                        try:(
-                            self.infoList,
-                            self.dataList,
-                            self.dataList2
-                            ) = DolphinNewVoltageMeasurementwithELoad.Execute_Voltage_Accuracy(self, dict, self.PSU_Channel)
-                    
-                        except Exception as e:
-                            QMessageBox.warning(self, "Error", str(e))
-                            return
+                # Check for missing parameters
+                missing = self.check_missing_params(dict)
+                if missing:
+                    print(f"The following parameters are missing or empty: {missing}")
+                    return
 
-                    elif self.ELoad == "None" and self.DMM != "None":
-                        print("No ELoad connected and DMM connected") #No Eload connected but DMM connected
-                        try:(
-                            self.infoList,
-                            self.dataList,
-                            self.dataList2
-                            ) = DolphinNewVoltageMeasurementNoELoadWithDMM.Execute_Voltage_Accuracy(self, dict, self.PSU_Channel)
-                          
-                        except Exception as e:
-                            QMessageBox.warning(self, "Error", str(e))
-                            return
+                if self.simulation_mode == 2:
+                    QMessageBox.information(
+                        self,
+                        "Simulation Mode",
+                        "Simulation Mode is enabled. No instruments are connected.",
+                    )
                     
-                    elif self.ELoad != "None" and self.DMM == "None":
-                        print("ELoad connected and No DMM connected") #Eload connected but no DMM connected
-                        try:(
-                            self.infoList,
-                            self.dataList,
-                            self.dataList2
-                            ) = DolphinNewVoltageMeasurementwithELoadNoDMM.Execute_Voltage_Accuracy(self, dict, self.PSU_Channel)
-                        except Exception as e:
-                            QMessageBox.warning(self, "Error", str(e))
-                            return
-                    else :
-                        print("No ELoad connected and No DMM connected") #No Eload connected and
-                        try:(
-                            self.infoList,
-                            self.dataList,
-                            self.dataList2
-                            ) = DolphinNewVoltageMeasurementNoELoadNoDMM.Execute_Voltage_Accuracy(self, dict, self.PSU_Channel)
-                        except Exception as e:
-                            QMessageBox.warning(self, "Error", str(e))
-                            return
-                                            
-                if self.selected_text == "EDU36311A":
-                    try:(
-                        infoList,
-                        dataList,
-                        dataList2  
-                    ) = EDU36311AVoltageMeasurementNoELoad.Execute_Voltage_Accuracy(self, dict)
-                  
-                    except Exception as e:
-                        QMessageBox.warning(self, "Error", str(e))
-                        return
+                    wb = load_workbook(self.output_file)
+                    ws = wb["Data"]  # get the worksheet
+
+                    graph_plot = Graph_Plotting(
+                        wb,        # workbook
+                        ws,        # sheet
+                        self.output_file,
+                        "Voltage",
+                        1,
+                        [8],       # graph_start_rows
+                    )
+                    graph_plot.execute_plot()
+
+                    wb.save(self.output_file)  # save the charts back
+                    sleep(10)
                     
-                        """   elif self.selected_text == "Excavator":
+                else:
+                    QMessageBox.warning(
+                    self,
+                    "In Progress",
+                    "Measurement will start now , please do not close the main window until test is completed",
+                                        )
+                    
+                    """if self.relay_voltage == "RELAY":
+                        relay_voltage = RelayController_Voltage()
+                        relay_voltage.relay_on()"""
+
+                    if self.DMM_Instrument == "Keysight":
+
+                        if self.selected_text == "Dolphin":
+                            if self.ELoad != "None" and self.DMM != "None":
+                                print("ELoad connected and DMM connected") #All connected
                                 try:(
-                                    infoList,
-                                    dataList,
-                                    dataList2
-                                ) = ExcavatorVoltageMeasurement.Execute_Voltage_Accuracy(self, dict)
-
+                                    self.infoList,
+                                    self.dataList,
+                                    self.dataList2
+                                    ) = DolphinNewVoltageMeasurementwithELoad.Execute_Voltage_Accuracy(self, dict, self.PSU_Channel)
+                            
                                 except Exception as e:
                                     QMessageBox.warning(self, "Error", str(e))
                                     return
-                            elif self.selected_text == "SMU":
+
+                            elif self.ELoad == "None" and self.DMM != "None":
+                                print("No ELoad connected and DMM connected") #No Eload connected but DMM connected
                                 try:(
-                                    infoList, 
-                                    dataList,
-                                    dataList2
-                                ) = SMUVoltageMeasurement.Execute_Voltage_Accuracy(self, dict)
+                                    self.infoList,
+                                    self.dataList,
+                                    self.dataList2
+                                    ) = DolphinNewVoltageMeasurementNoELoadWithDMM.Execute_Voltage_Accuracy(self, dict, self.PSU_Channel)
+                                    
                                 except Exception as e:
-                                    QMessageBox.warning(self, "Error", str(e))  
-                                    return"""
-                
-                elif self.selected_text == "Hornbill":
-                    if self.ELoad != "None":
-                        try:(
-                            infoList,   
-                            dataList,
-                            dataList2
-                        ) = HornbillVoltageMeasurementwithELoad.Execute_Voltage_Accuracy(self, dict)
-                        except Exception as e:
-                            QMessageBox.warning(self, "Error", str(e))
-                            return
-                    else:
-                        try:(
-                            infoList,   
-                            dataList,
-                            dataList2
-                        ) = HornbillVoltageMeasurementNoELoad.Execute_Voltage_Accuracy(self, dict)
-                        except Exception as e:
-                            QMessageBox.warning(self, "Error", str(e))
-                            return
+                                    QMessageBox.warning(self, "Error", str(e))
+                                    return
+                            
+                            elif self.ELoad != "None" and self.DMM == "None":
+                                print("ELoad connected and No DMM connected") #Eload connected but no DMM connected
+                                try:(
+                                    self.infoList,
+                                    self.dataList,
+                                    self.dataList2
+                                    ) = DolphinNewVoltageMeasurementwithELoadNoDMM.Execute_Voltage_Accuracy(self, dict, self.PSU_Channel)
+                                except Exception as e:
+                                    QMessageBox.warning(self, "Error", str(e))
+                                    return
+                            else :
+                                print("No ELoad connected and No DMM connected") #No Eload connected and
+                                try:(
+                                    self.infoList,
+                                    self.dataList,
+                                    self.dataList2
+                                    ) = DolphinNewVoltageMeasurementNoELoadNoDMM.Execute_Voltage_Accuracy(self, dict, self.PSU_Channel)
+                                except Exception as e:
+                                    QMessageBox.warning(self, "Error", str(e))
+                                    return
+                                                    
+                        if self.selected_text == "EDU36311A":
+                            try:(
+                                infoList,
+                                dataList,
+                                dataList2  
+                            ) = EDU36311AVoltageMeasurementNoELoad.Execute_Voltage_Accuracy(self, dict)
+                            
+                            except Exception as e:
+                                QMessageBox.warning(self, "Error", str(e))
+                                return
+                            
+                                """   elif self.selected_text == "Excavator":
+                                        try:(
+                                            infoList,
+                                            dataList,
+                                            dataList2
+                                        ) = ExcavatorVoltageMeasurement.Execute_Voltage_Accuracy(self, dict)
 
-            relay_voltage.relay_off()
-        
-            #Measurement Completion
-            if x == (int(self.noofloop) - 1):   
-                self.OutputBox.append("Measurement is complete !")
-        
-                #Export Data to CSV
-                if self.QCheckBox_Report_Widget.isChecked():
-                    instrumentData(self.PSU, self.DMM, self.ELoad)
-                    datatoCSV_Accuracy(self.infoList, self.dataList, self.dataList2)
-                    datatoGraph(self.infoList, self.dataList, self.dataList2)
-                    datatoGraph.scatterCompareVoltage(self, float(self.Programming_Error_Gain), float(self.Programming_Error_Offset), float(self.Readback_Error_Gain), float(self.Readback_Error_Offset), str(self.unit), float(self.Voltage_Rating))
-
-                    A = xlreport(save_directory=self.savelocation, file_name=str(self.unit))
-                    A.run()
-                    df = pd.DataFrame.from_dict(dict, orient="index")
-                    df.to_csv(os.path.join(csv_folder,"config.csv"))
+                                        except Exception as e:
+                                            QMessageBox.warning(self, "Error", str(e))
+                                            return
+                                    elif self.selected_text == "SMU":
+                                        try:(
+                                            infoList, 
+                                            dataList,
+                                            dataList2
+                                        ) = SMUVoltageMeasurement.Execute_Voltage_Accuracy(self, dict)
+                                        except Exception as e:
+                                            QMessageBox.warning(self, "Error", str(e))  
+                                            return"""
+                        
+                        elif self.selected_text == "Hornbill":
+                            if self.ELoad != "None" and self.DMM != "None":
+                                if self.checkbox_Voltage_Accuracy_Voltage_Mode == 2:
+                                    print("ELoad connected and DMM connected") #All connected
+                                    try:(
+                                        self.infoList,   
+                                        self.dataList,
+                                        self.dataList2
+                                    ) = HornbillVoltageMeasurementwithELoad.Execute_Voltage_Accuracy_Current_Static(self, dict, self.PSU_Channel)
+                                    except Exception as e:
+                                        QMessageBox.warning(self, "Error", str(e))
+                                        return
+                                elif self.checkbox_Voltage_Accuracy_Current_Mode == 2:
+                                    print("ELoad connected and DMM connected") #All connected
+                                    try:(
+                                        self.infoList,
+                                        self.dataList,
+                                        self.dataList2
+                                    ) = HornbillVoltageMeasurementwithELoad.Execute_Voltage_Accuracy_Current_Change(self, dict, self.PSU_Channel)
+                                    except Exception as e:
+                                        QMessageBox.warning(self, "Error", str(e))
+                                        return
+                            else:
+                                print("No ELoad connected and DMM connected") #No Eload connected but DMM connected
+                                
+                    """if self.relay_voltage == "RELAY":
+                        relay_voltage.relay_off()
+                    """
+                    #Measurement Completion
+                    if x == (int(self.noofloop) - 1):   
+                        self.OutputBox.append("Measurement is complete !")
                 
-                #Show Graph Image
-                if self.QCheckBox_Image_Widget.isChecked():
-                    self.image_dialog = image_Window()
-                    self.image_dialog.setModal(True)
-                    self.image_dialog.show()
+                        #Export Data to CSV
+                        if self.QCheckBox_Report_Widget.isChecked():
+                            if self.QCheckBox_Voltage_Accuracy_Voltage_Mode_Widget.isChecked():
+                                instrumentData(self.PSU, self.DMM, self.ELoad)
+                                datatoCSV_Accuracy(self.infoList, self.dataList, self.dataList2)
+                                datatoGraph(self.infoList, self.dataList, self.dataList2)
+                                datatoGraph.scatterCompareVoltage(self, float(self.Programming_Error_Gain), float(self.Programming_Error_Offset), float(self.Readback_Error_Gain), float(self.Readback_Error_Offset), str(self.unit), float(self.Voltage_Rating))
+
+                                
+                                df = pd.DataFrame.from_dict(dict, orient="index")
+                                df.to_csv(os.path.join(csv_folder,"config.csv"))
+
+                                A = xlreport(save_directory=self.savelocation, file_name=str(self.unit))
+                                self.output_file = A.run()
+
+                            elif self.QCheckBox_Voltage_Accuracy_Current_Mode_Widget.isChecked():
+                                instrumentData(self.PSU, self.DMM, self.ELoad)
+                                datatoCSV_Accuracy(self.infoList, self.dataList, self.dataList2)
+                                datatoGraph(self.infoList, self.dataList, self.dataList2)
+                                datatoGraph.scatterCompareVoltage_Current_Change(self, float(self.Programming_Error_Gain), float(self.Programming_Error_Offset), float(self.Readback_Error_Gain), float(self.Readback_Error_Offset), str(self.unit), float(self.Voltage_Rating))
+
+                                df = pd.DataFrame.from_dict(dict, orient="index")
+                                df.to_csv(os.path.join(csv_folder,"config.csv"))
+
+                                A = xlreport(save_directory=self.savelocation, file_name=str(self.unit))
+                                A.run()
+                        
+                        #Show Graph Image
+                        if self.QCheckBox_Image_Widget.isChecked():
+                            self.image_dialog = image_Window()
+                            self.image_dialog.setModal(True)
+                            self.image_dialog.show()
 
 
         except Exception as e:
@@ -1520,6 +1685,9 @@ class VoltageMeasurementDialog(QDialog):
             return
         finally:
             self.setEnabled(True)
+
+    def stop_execution(self):
+        self.stop_requested = True
 
 class CurrentMeasurementDialog(QDialog):
     """Class for configuring the current measurement DUT Tests Dialog.
@@ -5719,7 +5887,6 @@ class ProgrammingSpeed(QDialog):
         self.OutputBox.append(my_result.getvalue())
         self.OutputBox.append("Measurement is complete !")
 
-
 class PowerMeasurementDialog(QDialog):
     """Class for configuring the voltage measurement DUT Tests Dialog.
     A widget is declared for each parameter that can be customized by the user. These widgets can come in
@@ -8465,7 +8632,232 @@ class BundleMeasurementCurrentandPowerDialog(QDialog):
                             self.image_dialog.setModal(True)
                             self.image_dialog.show()
                         
-  
+class VoltageCalibrationDialog(QDialog):
+    """Class for configuring the voltage calibration DUT Tests Dialog."""
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("PSU Voltage Calibration GUI")
+        self.resize(800, 520)
+
+        # Form inputs
+        form = QFormLayout()
+        self.psu_input = QLineEdit("TCPIP0::141.183.191.52::inst0::INSTR")
+        form.addRow("PSU Address:", self.psu_input)
+
+        self.dmm_input = QLineEdit("USB0::0x2A8D::0x0201::MY57700532::0::INSTR")
+        form.addRow("DMM Address:", self.dmm_input)
+
+        self.pw_input = QLineEdit("PP8000A")
+        form.addRow("Calibration Password:", self.pw_input)
+
+        self.channel_input = QSpinBox()
+        self.channel_input.setRange(1, 16)
+        self.channel_input.setValue(1)
+        form.addRow("Channel:", self.channel_input)
+
+        self.points_input = QLineEdit("P1,P2")
+        form.addRow("Calibration Points (csv):", self.points_input)
+
+        # Buttons
+        self.start_btn = QPushButton("Start Calibration")
+        self.start_btn.clicked.connect(self.on_start)
+        self.stop_btn = QPushButton("Stop")
+        self.stop_btn.setEnabled(False)
+        self.stop_btn.clicked.connect(self.on_stop)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addWidget(self.start_btn)
+        btn_layout.addWidget(self.stop_btn)
+
+        # Log
+        self.log = QTextEdit()
+        self.log.setReadOnly(True)
+
+        # Layout
+        layout = QVBoxLayout()
+        layout.addLayout(form)
+        layout.addLayout(btn_layout)
+        layout.addWidget(QLabel("Log:"))
+        layout.addWidget(self.log)
+        self.setLayout(layout)
+
+        self.worker = None
+
+    def append_log(self, text):
+        self.log.append(text)
+        self.log.moveCursor(self.log.textCursor().End)
+
+    def on_start(self):
+        psu_addr = self.psu_input.text().strip()
+        dmm_addr = self.dmm_input.text().strip()
+        pw = self.pw_input.text().strip()
+        ch = self.channel_input.value()
+        points = [p.strip() for p in self.points_input.text().split(',') if p.strip()]
+
+        if not psu_addr or not dmm_addr:
+            QMessageBox.warning(self, "Missing", "Please provide both PSU and DMM VISA addresses.")
+            return
+
+        self.start_btn.setEnabled(False)
+        self.stop_btn.setEnabled(True)
+        self.log.clear()
+        self.append_log("Starting calibration thread...")
+
+        self.worker = CalWorker(psu_addr, dmm_addr, pw, ch, points)
+        self.worker.log.connect(self.append_log)
+        self.worker.finished.connect(self.on_finished)
+        self.worker.error.connect(self.on_error)
+        self.worker.start()
+
+    def on_stop(self):
+        if self.worker:
+            self.append_log("Stop requested...")
+            self.worker.stop()
+            self.stop_btn.setEnabled(False)
+
+    def on_finished(self):
+        self.append_log("Calibration finished")
+        self.start_btn.setEnabled(True)
+        self.stop_btn.setEnabled(False)
+        self.worker = None
+
+    def on_error(self, msg):
+        QMessageBox.critical(self, "Error", f"Calibration error:\n{msg}")
+
+class CalWorker(QThread):
+    log = pyqtSignal(str)
+    finished = pyqtSignal()
+    error = pyqtSignal(str)
+
+    def __init__(self, psu_addr, dmm_addr, password, channel, cal_points):
+        super().__init__()
+        self.psu_addr = psu_addr
+        self.dmm_addr = dmm_addr
+        self.password = password
+        self.channel = int(channel)
+        self.cal_points = cal_points
+        self._stop_requested = False
+
+    def stop(self):
+        self._stop_requested = True
+
+    def scpi(self, inst, cmd, delay=0.2):
+        inst.write(cmd)
+        time.sleep(delay)
+
+    def check_error(self, psu):
+        try:
+            err = psu.query("SYST:ERR?")
+            if not err.startswith("0"):
+                self.log.emit(f"⚠ PSU ERROR: {err}")
+            return err
+        except Exception as e:
+            self.log.emit(f"Error querying SYST:ERR?: {e}")
+            return None
+
+    """def run(self):
+        try:
+            self.log.emit("Opening VISA resources...")
+            rm = pyvisa.ResourceManager()
+            psu = None
+            dmm = None
+            try:
+                psu = rm.open_resource(self.psu_addr)
+                psu.timeout = 60000
+                dmm = rm.open_resource(self.dmm_addr)
+                dmm.timeout = 10000
+            except Exception as e:
+                raise RuntimeError(f"Failed to open instruments: {e}")
+
+            # Step 1: CAL:STAT ON
+            self.scpi(psu, 'OUTPUT:STATe ON, (@1)')  # Ensure output is ON"')
+            time.sleep(2)
+            self.log.emit('Step 1: CAL:STAT ON, "PP8000A"')
+            self.scpi(psu, 'CAL:STAT ON,"PP8000A"')
+            time.sleep(2)
+            self.check_error(psu)
+            if self._stop_requested:
+                raise RuntimeError("Stopped by user")
+
+            # Step 2: CAL:VOLT 60, (@1)
+            self.log.emit(f"Step 2: CAL:VOLT 60, (@{self.channel})")
+            self.scpi(psu, f"CAL:VOLT 60,(@{self.channel})")
+            time.sleep(2)
+            self.check_error(psu)
+            if self._stop_requested:
+                raise RuntimeError("Stopped by user")
+
+            # Configure DMM
+            self.log.emit("Configuring DMM...")
+            dmm.write(":CONFigure:VOLTage:DC AUTO,MAXimum")
+            dmm.write("TRIG:SOUR IMM")
+            dmm.write("SAMP:COUN 1")
+            time.sleep(2)
+
+            # Steps 3-6: Loop through cal points
+            for point in self.cal_points:
+                if self._stop_requested:
+                    raise RuntimeError("Stopped by user")
+
+                self.log.emit(f"Step 3/5: CAL:LEV {point}")
+                self.scpi(psu, f"CAL:LEV {point}")
+                time.sleep(2)
+                self.check_error(psu)
+                time.sleep(30)
+
+                self.log.emit("Measuring DMM...")
+                val = dmm.query("MEAS:VOLT:DC?").strip()
+                self.log.emit(f"DMM reading = {val}")
+
+                self.log.emit(f"Step 4/6: CAL:DATA {val}")
+                self.scpi(psu, f"CAL:DATA {val}")
+                time.sleep(2)
+                self.check_error(psu)
+                time.sleep(2)
+
+            # Step 7: CAL:SAVE
+            self.log.emit("Step 7: CAL:SAVE")
+            self.scpi(psu, "CAL:SAVE")
+            time.sleep(2)
+            self.check_error(psu)
+            time.sleep(2.0)
+
+            # Step 8: CAL:STAT OFF
+            self.log.emit("Step 8: CAL:STAT OFF")
+            self.scpi(psu, "CAL:STAT OFF")
+            time.sleep(2)
+            self.check_error(psu)
+
+            self.log.emit("=== CALIBRATION COMPLETE ✅ ===")
+
+        except Exception as e:
+            tb = traceback.format_exc()
+            self.log.emit(f"ERROR: {e}\n{tb}")
+            self.error.emit(str(e))
+        finally:
+            try:
+                if 'psu' in locals() and psu is not None:
+                    psu.close()
+                if 'dmm' in locals() and dmm is not None:
+                    dmm.close()
+            except Exception:
+                pass
+            self.finished.emit()"""
+    def run2(self):
+        dict = dictGenerator.input(
+            PSU=self.psu_addr,
+            DMM=self.dmm_addr,
+            password=self.password,
+            channel=self.channel,
+            cal_points=self.cal_points,
+        )
+        try:
+            HornbillVoltageCalibration.Execute_Voltage_Calibration(self, dict)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", str(e)) 
+        
+        self.finished.emit()
+
 ########----------------------- Advanced Setting for Standalone Code ----------------#####################
 class AdvancedSetting_Voltage(QDialog):
     """This class is to configure the Advanced Settings when conducting voltage measurements,
@@ -8699,19 +9091,30 @@ class image_Window(QDialog):
         super().__init__()
         self.setWindowTitle("Image")
         self.im = QPixmap(IMAGE_PATH)
+        self.im2 = QPixmap(IMAGE_PATH_2)
         
         # Check if the image loaded successfully
         if self.im.isNull():
             QMessageBox.warning(self, "Error", "Failed to load image.")
             self.close()  # Close the window
             return
+        if self.im2.isNull():
+            QMessageBox.warning(self, "Error", "Failed to load image.")
+            self.close()  # Close the window
+            return
         
         self.label = QLabel()
         self.label.setPixmap(self.im)
+
+        self.label2 = QLabel()
+        self.label2.setPixmap(self.im2)
         
         self.grid = QGridLayout()
         self.grid.addWidget(self.label, 1, 1)
+        self.grid.addWidget(self.label2, 1, 2)
+
         self.setLayout(self.grid)
+
         self.setWindowFlags(Qt.Window)
         self.setModal(False)  # Set the dialog to be non-modal
         self.show()

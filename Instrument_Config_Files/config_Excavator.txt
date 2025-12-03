@@ -19,8 +19,8 @@ DMM = USB0::0x2A8D::0x1601::MY60094787::0::INSTR
 ELoad = USB0::0x2A8D::0xDA04::CN24350105::0::INSTR
 
 //Instrument Channel and Sense Settings
-ELoad_Channel = 2
-PSU_Channel = 2
+ELoad_Channel = 1
+PSU_Channel = 1
 DMM_Instrument = Keysight
 setFunction = Current
 VoltageRes = SLOW

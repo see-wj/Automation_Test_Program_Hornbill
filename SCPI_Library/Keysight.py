@@ -42,6 +42,16 @@ class Subsystem(object):
             # Visa Address is found under Keysight Connection Expert
             self.instr = rm.open_resource(self.VISA_ADDRESS)
             self.instr.timeout = self.timeout  # Set the timeout for the instrument
+            # Fix 1: Ensure proper termination
+            self.instr.write_termination = '\n'
+            self.instr.read_termination = '\n'
+
+            # Fix 2: Increase buffer size for DIAG data
+            self.instr.read_buffer_size = 20000
+
+            # Fix 3: Increase timeout
+            self.instr.timeout = 5000   # 5 seconds
+
         except pyvisa.VisaIOError as e:
             print(f"VISA IO Error: {e.args}")
             self.instr = None  # Ensure instr is set to None if there's an error
@@ -1196,28 +1206,58 @@ class Hornbill(Subsystem):
     def __init__(self, VISA_ADDRESS):
         super().__init__(VISA_ADDRESS)
 
-    def setMode(self, mode):
-        self.instr.write(f"FUNC:MODE {mode}")
+    def sourVoltageLevelImmediateAmplitude(self, Value, ChannelNumber):
+        self.instr.write(f"SOURce:VOLTage:LEVel:IMMediate:AMPLitude {Value}, (@{ChannelNumber})")
+    
+    def sourCurrentLimitPOS(self, Value, ChannelNumber):
+        self.instr.write(f"SOURce:CURRent:LIMit:POS:IMMediate:AMPLitude {Value}, (@{ChannelNumber})")
 
-    def setFrequency(self, frequency):
-        self.instr.write(f"SOUR:FREQ {frequency}")
+    def senseVoltageSource(self, Mode, ChannelNumber):
+        self.instr.write(f"SOURce:VOLTage:SENSe:SOURce {Mode}, (@{ChannelNumber})")
+                
+    def outputState(self, state, ChannelNumber):
+        self.instr.write(f"OUTPut:STATe {state}, (@{ChannelNumber})")
 
-    def setPower(self, power):
-        self.instr.write(f"SOUR:POW {power}")
+    def measureVoltageDC(self, ChannelNumber):
+        return self.instr.query(f"MEASure:VOLTage:DC? (@{ChannelNumber})")
+    
+    def measureCurrentDC(self, ChannelNumber):
+        return self.instr.query(f"MEASure:CURRent:DC? (@{ChannelNumber})")
+    
+    def askSourCurrentLimitPOSImmediateAmplitude(self, Condition, ChannelNumber):
+        return self.instr.query(f"SOURce:CURRent:LIMit:POSitive:IMMediate:AMPLitude? {Condition}, (@{ChannelNumber})")
+    
+    def diagVoltageReadbacklocal(self):
+        self.instr.write("DIAG:PEEK? 20,2")
+        resp = self.instr.read_raw()
+        return resp
+    
+    def diagVoltageReadback_VMON_100k(self):
+        self.instr.write("DIAG:PEEK? 20,0,100000")
+        resp = self.instr.read_raw()
+        return resp
+    
+    def diagVoltageReadback_VMON_200k(self):
+        self.instr.write("DIAG:PEEK? 20,0,200000")
+        resp = self.instr.read_raw()
+        return resp
+    
+    def diagCurrentReadback_IMON_FULL_100k(self):
+        self.instr.write("DIAG:PEEK? 20,7,100000")
+        resp = self.instr.read_raw()
+        return resp
+    
+    def diagCurrentReadback_IMON_200uA_100k(self):
+        self.instr.write("DIAG:PEEK? 21,1,100000")
+        resp = self.instr.read_raw()
+        return resp
 
-    def outputOn(self):
-        self.instr.write("OUTP ON")
+    def diagCurrentReadback_IMON_2mA_100k(self):
+        self.instr.write("DIAG:PEEK? 26,6,100000")
+        resp = self.instr.read_raw()
+        return resp
 
-    def outputOff(self):
-        self.instr.write("OUTP OFF")
+    
 
-    def queryFrequency(self):
-        return self.instr.query("SOUR:FREQ?")
 
-    def queryPower(self):
-        return self.instr.query("SOUR:POW?")
-
-    def queryOutputState(self):
-        return self.instr.query("OUTP?")
-
-print ("Keysight SCPI command List Loaded.")
+    
