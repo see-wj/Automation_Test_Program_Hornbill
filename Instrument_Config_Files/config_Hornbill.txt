@@ -61,7 +61,7 @@ minCurrent = 1
 maxCurrent = 20
 current_step_size = 5
 minVoltage = 3
-maxVoltage = 60
+maxVoltage = 3000
 voltage_step_size = 3
 
 

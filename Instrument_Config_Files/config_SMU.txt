@@ -21,8 +21,8 @@ DMM2 = USB0::0x2A8D::0x1601::MY60094787::0::INSTR
 DMM_Instrument = Keysight
 
 //General Settings (set 0 for channel 1)
-PSU_Channel = 0
-ELoad_Channel = 0
+PSU_Channel = 1
+ELoad_Channel = 1
 setFunction = Current
 VoltageRes = SLOW
 VoltageSense = EXT

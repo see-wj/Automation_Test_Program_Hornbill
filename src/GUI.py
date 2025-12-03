@@ -1193,8 +1193,8 @@ class VoltageMeasurementDialog(QDialog):
         return config_data"""
     
 
-    def load_data(self):
-        """Reads configuration file and returns a dictionary of key-value pairs."""
+    """def load_data(self):
+        Reads configuration file and returns a dictionary of key-value pairs.
         config_data = {}
 
         # Determine base folder for configs
@@ -1240,8 +1240,60 @@ class VoltageMeasurementDialog(QDialog):
         except FileNotFoundError:
             print(f"⚠️ Config file not found: {self.config_file}. Using default values.")
 
-        return config_data
+        return config_data"""
     
+    def load_data(self):
+        """Reads configuration file and returns a dictionary of key-value pairs."""
+        config_data = {}
+
+        config_map = {
+            "Excavator": "config_Excavator.txt",
+            "Dolphin": "config_Dolphin.txt",
+            "SMU": "config_SMU.txt",
+            "Hornbill": "config_Hornbill.txt",
+        }
+
+        filename = config_map.get(self.selected_text, "config_Others.txt")
+
+        # Ensure path is a string, avoids crashes
+        self.config_file = str(config_folder / filename)
+
+        if not os.path.exists(self.config_file):
+            print(f"⚠ Config file not found: {self.config_file}")
+            return {}
+
+        try:
+            with open(self.config_file, "r", encoding="utf-8-sig") as file:
+                for line in file:
+                    line = line.strip()
+
+                    if not line or line.startswith("#") or line.startswith("//"):
+                        continue
+
+                    if "=" not in line:
+                        print("⚠ Skipping invalid line:", repr(line))
+                        continue
+
+                    key, value = line.split("=", 1)
+                    config_data[key.strip()] = value.strip()
+
+
+            for key, value in config_data.items():
+                if key == "savelocation":
+                    if getattr(self, "savelocation", None) and \
+                    self.savelocation != "C:/PyVisa - Copy  - Excavator - Copy/PyVisa/Test Data/File Export Testing":
+                        continue
+                    setattr(self, key, value)
+                else:
+                    setattr(self, key, value)
+
+        except Exception as e:
+            print(f"ERROR reading config: {e}")
+
+        return config_data
+
+
+
     def Power_changed(self, value):
         self.Power = value
 
