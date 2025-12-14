@@ -1,0 +1,51 @@
+#Configuration Setting for Excavator
+
+//Initial Settings
+Voltage_Rating = 80
+Power = 2200
+currloop = 1
+voltloop = 1
+estimatetime = 0
+readbackvoltage = 0
+readbackcurrent = 0
+savelocation = C:/PyVisa - Copy  - Excavator - Copy/PyVisa/Test Data/File Export Testing
+noofloop = 3
+updatedelay = 3.0
+unit = VOLTAGE
+
+//Visa Address Default Settings
+PSU = USB0::0x2A8D::0xDA04::CN24350097::0::INSTR
+DMM = USB0::0x2A8D::0x1601::MY60094787::0::INSTR
+ELoad = USB0::0x2A8D::0xDA04::CN24350105::0::INSTR
+
+//Instrument Channel and Sense Settings
+ELoad_Channel = 1
+PSU_Channel = 1
+DMM_Instrument = Keysight
+setFunction = Current
+VoltageRes = SLOW
+VoltageSense = INT
+checkbox_data_Report = 2
+checkbox_data_Image = 2
+
+//Error Settings
+Programming_Error_Offset =3
+Programming_Error_Gain = 2
+Readback_Error_Offset = 0.0003
+Readback_Error_Gain = 0.024
+
+//Voltage & Current Settings
+minCurrent = 1
+maxCurrent = 1
+current_step_size = 1
+minVoltage = 1
+maxVoltage = 10
+voltage_step_size = 1
+
+//DMM Settings (Default Hardcoded in GUI.py)
+Range = Auto
+Aperture = 10
+AutoZero = ON
+inputZ = ON
+UpTime = 50
+DownTime = 50

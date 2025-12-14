@@ -5,7 +5,8 @@ Hornbill: PSU
 
 //Electronics Load Instrument 
 EL33133A: ELOAD
-EL34243A:ELOAD
+EL34243A: ELOAD
+E36731A: ELOAD
 
 
 //Digital Multimeter

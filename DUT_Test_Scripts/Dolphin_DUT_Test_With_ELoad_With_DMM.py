@@ -142,7 +142,7 @@ class DolphinNewVoltageMeasurementwithELoad:
         self.dataList = []
         self.dataList2 = []
 
-    def Execute_Voltage_Accuracy(self,dict,channel):
+    def Execute_Voltage_Accuracy(self,dict,channel, worker=None):
         (
             Read,
             Apply,
@@ -314,6 +314,9 @@ class DolphinNewVoltageMeasurementwithELoad:
                 WAI(dict["PSU"])
                 sleep(1)
                 self.dataList2.insert(k, [float(temp_values), float(temp_values2)])
+
+                if worker is not None:
+                    worker.new_data.emit(float(temp_values), float(temp_values2))
                 
                 #INIT DMM (Trigger Measurement)
                 Initiate(dict["DMM"]).initiate()
@@ -350,6 +353,9 @@ class DolphinNewVoltageMeasurementwithELoad:
                         )
                         break
                 WAI(dict["DMM"])
+
+                if worker and worker.stop_requested:
+                    break
 
                 #Increment of Steps
                 #Delay(dict["PSU"]).write(dict["DownTime"])

@@ -33,7 +33,7 @@ print("⚡ Building Main GUI executable...")
 
 args = [
     str(script_file),
-    '--onefile',
+    '--onedir',
     '--console',
     '--name=Test_Automation_Program',
     '--distpath=Executable',

@@ -23,39 +23,29 @@ class Subsystem(object):
         state: A boolean representing if the function should be enabled or disabled.
     """
 
-    def __init__(self, VISA_ADDRESS, timeout=20000):
-        """Initialize the instance where the Instrument is ready to receive commands
-
-        Object rm is created where the backend will find the shared VISA Library. VISA_Address is given as
-        an argument to declare which resources (in this case, the instruments) to use.
-
-        Args:
-            VISA_ADDRESS: String Literal of VISA Address of the Instrument.
-            timeout: The timeout value for VISA communication in milliseconds (default is 20000 ms).
-        """
+    def __init__(self, VISA_ADDRESS, timeout=5000):
+        """Initialize the VISA instrument with proper VXI-11 support."""
         self.VISA_ADDRESS = VISA_ADDRESS
-        self.timeout = timeout  # Store the timeout value
 
-        # ResourceManager Setup
         rm = pyvisa.ResourceManager()
-        try:
-            # Visa Address is found under Keysight Connection Expert
-            self.instr = rm.open_resource(self.VISA_ADDRESS)
-            self.instr.timeout = self.timeout  # Set the timeout for the instrument
-            # Fix 1: Ensure proper termination
-            self.instr.write_termination = '\n'
-            self.instr.read_termination = '\n'
 
-            # Fix 2: Increase buffer size for DIAG data
+        try:
+            # Open resource normally (VXI-11 or USB or GPIB)
+            self.instr = rm.open_resource(self.VISA_ADDRESS)
+
+            # --- Important for VXI-11 ---
+            self.instr.write_termination = '\n'
+            self.instr.read_termination  = '\n'
+
+            # Timeout (ms)
+            self.instr.timeout = timeout     # one place only
+
+            # Recommended: increase buffer if reading large block data
             self.instr.read_buffer_size = 20000
 
-            # Fix 3: Increase timeout
-            self.instr.timeout = 5000   # 5 seconds
-
         except pyvisa.VisaIOError as e:
-            print(f"VISA IO Error: {e.args}")
-            self.instr = None  # Ensure instr is set to None if there's an error
-
+            print(f"VISA IO Error: {e}")
+            self.instr = None
 
 class Abort(Subsystem):
     """Child Class for Abort Subsystem"""

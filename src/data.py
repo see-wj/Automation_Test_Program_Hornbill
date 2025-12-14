@@ -18,6 +18,7 @@ from openpyxl.drawing.image import Image as ExcelImage
 from path import *
 from SCPI_Library.IEEEStandard import IDN
 from SCPI_Library.Keysight import System
+from path import csv_folder, IMAGE_DIR, IMAGE_PATH, IMAGE_PATH_2
 
 #------------------Instrument Data Collection---------------------
 class instrumentData(object):
@@ -118,9 +119,9 @@ class datatoCSV_Accuracy:
                     #A
                     ProgrammingI_error = Iabsolute_error 
 
-                    Vpercent_error = (Vabsolute_error / Vset.replace(0, float('nan'))) * 100 #programming percentage error
+                    Vpercent_error = Vabsolute_error #programming percentage error
                     
-                    Ipercent_error = (Iabsolute_error / Iset.replace(0, float('nan'))) * 100
+                    Ipercent_error = Iabsolute_error
 
                     #PSU Readback Measurement
                     Vreadback = pd.Series(self.column(dataList2, 0))
@@ -131,7 +132,7 @@ class datatoCSV_Accuracy:
                     Vreadback_error = (Vreadback - Vmeasured) 
                     Ireadback_error = (Ireadback - Imeasured) 
 
-                    Vreadback_percent_error = (Vreadback_error / Vmeasured.replace(0, float('nan'))) * 100
+                    Vreadback_percent_error = Vreadback_error
 
 
 
@@ -370,11 +371,15 @@ class datatoGraph(datatoCSV_Accuracy):
                         lower_error_limit2 = -upper_error_limit2
 
                         #Calculate Percentage Error
-                        ProgrammingV_percent_error = (ProgrammingV_percent_error / upper_error_limit) * 100
-                        ReadbackV_percent_error    = (ProgrammingV_percent_error / upper_error_limit) * 100
+                        ProgrammingV_percent_error = (ProgrammingV_error / upper_error_limit) * 100 
+                        ReadbackV_percent_error    = (Vreadback_error / upper_error_limit) * 100
+
+                        # Append to lists so they are saved later
+                        self.ProgrammingV_percent_error_list.append(ProgrammingV_percent_error)
+                        self.ReadbackV_percent_error_list.append(ReadbackV_percent_error)
 
                          # percentage limits (always ±100)
-                        upper_erro_percent_limit = (upper_error_limit/upper_error_limit)* 100
+                        upper_erro_percent_limit = (upper_error_limit/upper_error_limit) * 100
                         lower_erro_percent_limit = (lower_error_limit/upper_error_limit)* 100
                         upper_erro_percent_limit2 = (upper_error_limit/upper_error_limit)* 100
                         lower_erro_percent_limit2 = (lower_error_limit/upper_error_limit)* 100
@@ -457,12 +462,12 @@ class datatoGraph(datatoCSV_Accuracy):
                         conditionC2 = pd.concat([conditionC2, condition_series2])
 
                         # Collect percentage results for CSV output
-                        upper_erro_percent_limitC = pd.concat([upper_erro_percent_limitC, upper_erro_percent_limitC])
-                        lower_erro_percent_limitC = pd.concat([lower_erro_percent_limitC, lower_erro_percent_limitC])
+                        upper_erro_percent_limitC = pd.concat([upper_erro_percent_limitC, upper_erro_percent_limit])
+                        lower_erro_percent_limitC = pd.concat([lower_erro_percent_limitC, lower_erro_percent_limit])
                         condition_percentC = pd.concat([condition_percentC, condition_series_percent])  
 
-                        upper_erro_percent_limitC2 = pd.concat([upper_erro_percent_limitC2, upper_erro_percent_limitC])
-                        lower_erro_percent_limitC2 = pd.concat([lower_erro_percent_limitC2, lower_erro_percent_limitC])
+                        upper_erro_percent_limitC2 = pd.concat([upper_erro_percent_limitC2, upper_erro_percent_limit2])
+                        lower_erro_percent_limitC2 = pd.concat([lower_erro_percent_limitC2, lower_erro_percent_limit2])
                         condition2_percentC = pd.concat([condition2_percentC, condition_series2_percent])
                     
             
@@ -523,14 +528,18 @@ class datatoGraph(datatoCSV_Accuracy):
 
                     # Drop the 'key' column from ungrouped_df
                     ungrouped_df.drop(columns=["key"], inplace=True)
+                    # After the loop
+                    ungrouped_df["Relative/Voltage Percentage Error (%)"] = pd.concat(self.ProgrammingV_percent_error_list).reset_index(drop=True)
+                    ungrouped_df["PSU Readback Voltage Percentage Error (%)"] = pd.concat(self.ReadbackV_percent_error_list).reset_index(drop=True)
+
 
                     # Combine all DataFrames into a single DataFrame
-                    combined_df = pd.concat([ungrouped_df, upper_error_limitF, lower_error_limitF, conditionFF, upper_error_limitF2, lower_error_limitF2, conditionFF2], axis=1)
-                    combined_df2 = pd.concat([combined_df, upper_error_limitF_percent, lower_error_limitF_percent, conditionFF_percent, upper_error_limitF2_percent, lower_error_limitF2_percent, conditionFF2_percent], axis=1)
+                    combined_df = pd.concat([ungrouped_df, upper_error_limitF, lower_error_limitF, conditionFF, upper_error_limitF2, lower_error_limitF2, conditionFF2, upper_error_limitF_percent, lower_error_limitF_percent, conditionFF_percent, upper_error_limitF2_percent, lower_error_limitF2_percent, conditionFF2_percent], axis=1)
+                    #combined_df2 = pd.concat([combined_df, upper_error_limitF_percent, lower_error_limitF_percent, conditionFF_percent, upper_error_limitF2_percent, lower_error_limitF2_percent, conditionFF2_percent], axis=1)
 
                     # Save the combined DataFrame to a CSV file
                     combined_df.to_csv(ERROR_CSV_PATH, index=False)
-                    combined_df2.to_csv(ERROR_CSV_PATH_PERCENT, index=False)
+                    #combined_df2.to_csv(ERROR_CSV_PATH_PERCENT, index=False)
                     fig.savefig(IMAGE_PATH)
                     plt.close(fig)
                     fig_percent.savefig(IMAGE_PATH_2)
@@ -589,8 +598,8 @@ class datatoGraph(datatoCSV_Accuracy):
                         lower_error_limit2 = -upper_error_limit2
 
                         #Calculate Percentage Error
-                        ProgrammingV_percent_error = (ProgrammingV_percent_error / upper_error_limit) * 100
-                        ReadbackV_percent_error    = (Vreadback_error / upper_error_limit) * 100
+                        ProgrammingV_percent_error = (ProgrammingV_percent_error / upper_error_limit)
+                        ReadbackV_percent_error    = (Vreadback_error / upper_error_limit)
 
                          # percentage limits (always ±100)
                         upper_erro_percent_limit = upper_error_limit/upper_error_limit

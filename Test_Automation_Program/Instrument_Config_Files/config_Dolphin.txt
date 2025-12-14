@@ -1,0 +1,112 @@
+#Configuration Setting for Dolphin (E36441A) (Testing)
+
+//Default Settings (For initialization)
+savelocation = C:/PyVisa - Copy  - Excavator - Copy/PyVisa/Test Data/File Export Testing
+currloop = 1
+voltloop = 1
+readbackvoltage = 0
+readbackcurrent = 0
+estimatetime = 0
+noofloop = 1
+updatedelay = 3.0
+
+//Connections (Visa Address Default Settings)
+PSU = USB0::0x2A8D::0xCC04::CN10000023::0::INSTR
+DMM = USB0::0x2A8D::0x0201::MY57702180::0::INSTR
+ELoad = USB0::0x2A8D::0x3702::MY60260104::0::INSTR
+OSC = USB0::0x0957::0x1754::MY44004673::0::INSTR
+DMM2 = USB0::0x2A8D::0x1301::MY57702177::0::INSTR
+ACSource = USB0::0x2A8D::0x3801::LPQ0000103::0::INSTR
+DMM_Instrument = Keysight
+
+//General Settings
+PSU_Channel = 1
+ELoad_Channel = 1
+setFunction = Voltage
+VoltageRes = SLOW
+VoltageSense = EXT
+rshunt = 0.01
+
+//Error Settings
+Programming_Error_Gain = 0.0005
+Programming_Error_Offset = 0.005
+Readback_Error_Gain = 0.0005
+Readback_Error_Offset = 0.005
+Load_Programming_Error_Gain =  0.0001
+Load_Programming_Error_Offset =  0.002
+
+Programming_Response_Up_NoLoad = 80
+Programming_Response_Up_FullLoad = 80
+Programming_Response_Down_NoLoad = 500
+Programming_Response_Down_FullLoad = 500
+
+OVP_ErrorGain = 0.002
+OVP_ErrorOffset = 0.4
+
+//Power 
+Power_Rating = 160
+Power = 160
+powerini = 0
+power_step_size = 10
+
+Power_Programming_Error_Offset = 0.0005
+Power_Programming_Error_Gain = 0.005
+Power_Readback_Error_Offset = 0.0005
+Power_Readback_Error_Gain = 0.005
+
+//Voltage & Current Settings
+Voltage_Rating = 32
+Current_Rating = 10
+minCurrent = 1
+maxCurrent = 10
+current_step_size = 1
+minVoltage = 1
+maxVoltage = 32
+voltage_step_size = 1
+
+
+//DMM Settings (Default Hardcoded in GUI.py)
+Range = Auto
+Aperture = 10
+AutoZero = ON
+//Auto - ON, 10M - OFF
+inputZ = ON
+UpTime = 50
+DownTime = 50
+
+//Oscilloscope Settings
+DUT_OSC_Channel = CHANNEL1
+CurrentTrigger_OSC_Channel = CHANNEL2
+TriggerSource = CHANNEL2
+DUT_Channel_Unit = VOLT
+DUT_Channel_Offset = 0
+DUT_Channel_CouplingMode = AC
+DUT_Trigger_CouplingMode = DC
+DUT_Trigger_Mode = EDGE
+DUT_Trigger_SweepMode = NORMAL
+DUT_Trigger_SlopeMode = EITHer
+DUT_TimeScale = 0.0002
+DUT_VerticalScale = 0.5
+DUT_V_Settling_Band = 0.5
+DUT_T_Settling_Band = 0.0005
+DUT_Probe_Setting = X10
+DUT_Acq_Type = AVERage
+DUT_Unit = VOLT
+CurrentTrigger_Channel_Unit = AMPere
+CurrentTrigger_Channel_Offset = -2
+CurrentTrigger_Channel_CouplingMode = DC
+CurrentTrigger_Trigger_CouplingMode = DC
+CurrentTrigger_Trigger_Mode = EDGE
+CurrentTrigger_Trigger_SweepMode = NORMAL
+CurrentTrigger_Trigger_SlopeMode = EITHer
+CurrentTrigger_TimeScale = 0.01
+CurrentTrigger_VerticalScale = 2
+CurrentTrigger_V_Settling_Band = 1
+CurrentTrigger_T_Settling_Band = 0.001
+CurrentTrigger_Probe_Setting = X100
+CurrentTrigger_Acq_Type = AVERage
+CurrentTrigger_Unit = AMPere
+
+
+//Auxiliary Equipments
+relay_voltage = RELAY

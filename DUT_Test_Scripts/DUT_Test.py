@@ -99,36 +99,45 @@ class Dimport:
 
 #Check Visa IO address
 class VisaResourceManager:
-    """Manage the VISA Resources"""
+    """Manage the VISA Resources
+
+    Attributes:
+        args: args should contain one or multiple string containing the Visa Address of an dict["Instrument"]
+
+    """
 
     def __init__(self):
-        self.rm = pyvisa.ResourceManager()
-        self.instruments = []  # store all opened instruments
+        """Initiate the object rm as Resource Manager"""
+        rm = pyvisa.ResourceManager()
+        self.rm = rm
 
     def openRM(self, *args):
-        """Open VISA Resources"""
-        try:
-            self.instruments.clear()
-            for addr in args:
-                instr = self.rm.open_resource(addr)
-                try:
-                    instr.baud_rate = 9600  # only for serial devices
-                except AttributeError:
-                    pass
-                self.instruments.append(instr)
+        """Open the VISA Resources to be used
 
-            return 1, self.instruments
+        The program also initiates and standardize certain specifications such as the baud rate.
+
+            Args:
+                *args: to declare single or multiple VISA Resources
+
+            Returns:
+                Return a Boolean to the program whether there were any errors encountered.
+
+            Raises:
+                VisaIOError: An error occured when opening PyVisa Resources
+
+        """
+        try:
+            for i in range(len(args)):
+                instr = self.rm.open_resource(args[i])
+                instr.baud_rate = 9600
+
+            return 1, None
         except pyvisa.VisaIOError as e:
             print(e.args)
             return 0, e.args
 
     def closeRM(self):
-        """Closes all VISA Resources"""
-        for instr in getattr(self, "instruments", []):
-            try:
-                instr.close()
-            except Exception:
-                pass
+        """Closes the Visa Resources when not in used"""
         self.rm.close()
 
 ######################################################################
@@ -140,7 +149,7 @@ class NewVoltageMeasurement:
         self.dataList = []
         self.dataList2 = []
 
-    def Execute_Voltage_Accuracy(self,dict,channel):
+    def Execute_Voltage_Accuracy(self,dict,channel, worker=None):
         (
             Read,
             Apply,
@@ -300,6 +309,7 @@ class NewVoltageMeasurement:
                 #Set Voltage and Current
                 if V > float(dict["maxVoltage"]):
                     V = float(dict["maxVoltage"])
+                    
                 Voltage(dict["PSU"]).setOutputVoltage( V )
                 WAI(dict["PSU"])
                 self.infoList.insert(k, [V, I_fixed, i])
@@ -317,6 +327,9 @@ class NewVoltageMeasurement:
                 WAI(dict["PSU"])
                 sleep(1)
                 self.dataList2.insert(k, [float(temp_values), float(temp_values2)])
+
+                if worker is not None:
+                    worker.new_data.emit(float(temp_values), float(temp_values2))
                 
                 #INIT DMM (Trigger Measurement)
                 Initiate(dict["DMM"]).initiate()

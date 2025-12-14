@@ -11,7 +11,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.utils.units import pixels_to_EMU
 from openpyxl import load_workbook
 from openpyxl.chart.legend import Legend
-
+from path import csv_folder, IMAGE_DIR, IMAGE_PATH, IMAGE_PATH_2
 
 
 class xlreport:
@@ -48,19 +48,22 @@ class xlreport:
 
     def run(self):
         """Generate the Excel report by importing CSV data, adding conditional formatting, and embedding an image."""
-        # Define chart_path for image insertion
+        """# Define chart_path for image insertion
         current_dir = os.path.dirname(os.path.abspath(__file__))  # src/
         project_root = os.path.abspath(os.path.join(current_dir, ".."))
         csv_folder = os.path.join(project_root, "csv")
         chart_path = os.path.join(csv_folder, "images", "Chart.png")
-        chart_path_2 = os.path.join(csv_folder, "images", "Chart2.png")
+        chart_path_2 = os.path.join(csv_folder, "images", "Chart2.png")"""
+        chart_path = str(IMAGE_PATH)
+        chart_path_2 = str(IMAGE_PATH_2)
+
 
         try:
             with pd.ExcelWriter(self.path, engine="openpyxl") as writer:
                 # Read CSV files
                 try:
                     df1 = pd.read_csv(os.path.join(csv_folder, "error.csv"))
-                    df3 = pd.read_csv(os.path.join(csv_folder, "error_percent.csv"))
+                    #df3 = pd.read_csv(os.path.join(csv_folder, "error_percent.csv"))
                     df2 = pd.read_csv(os.path.join(csv_folder, "instrumentData.csv"))
                     df4 = pd.read_csv(os.path.join(csv_folder, "config.csv"))
                 except FileNotFoundError as e:
@@ -69,7 +72,7 @@ class xlreport:
 
                 # Write DataFrames to Excel
                 df1.to_excel(writer, sheet_name="Data", index=False, startrow=7, startcol=3)
-                df3.to_excel(writer, sheet_name="Data", index=False, startrow=7, startcol=16)
+                #df3.to_excel(writer, sheet_name="Data", index=False, startrow=7, startcol=16)
                 df2.to_excel(writer, sheet_name="Data", index=False)
                 df4.to_excel(writer, sheet_name="Data", index=False, startrow=6)
 

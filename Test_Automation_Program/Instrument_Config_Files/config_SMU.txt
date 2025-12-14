@@ -1,0 +1,85 @@
+#Configuration Setting for SMU B2901A (Testing)
+
+//Default Settings (For initialization)
+savelocation = C:/PyVisa - Copy  - Excavator - Copy/PyVisa/Test Data/File Export Testing
+unit = VOLTAGE
+currloop = 1
+voltloop = 1
+readbackvoltage = 0
+readbackcurrent = 0
+estimatetime = 0
+I_Step = 
+noofloop = 1
+updatedelay = 3.0
+
+//Connections (Visa Address Default Settings)
+PSU = USB0::0x2A8D::0xDA04::CN24350097::0::INSTR
+DMM = USB0::0x2A8D::0x1601::MY60094787::0::INSTR
+ELoad = USB0::0x2A8D::0xDA04::CN24350105::0::INSTR
+OSC = USB0::0x0957::0x17B0::MY52060151::0::INSTR
+DMM2 = USB0::0x2A8D::0x1601::MY60094787::0::INSTR
+DMM_Instrument = Keysight
+
+//General Settings (set 0 for channel 1)
+PSU_Channel = 1
+ELoad_Channel = 1
+setFunction = Current
+VoltageRes = SLOW
+VoltageSense = EXT
+rshunt = 0.01
+
+//Error Settings
+Programming_Error_Gain = 0.001
+Programming_Error_Offset = 0.001
+Readback_Error_Gain = 0.001
+Readback_Error_Offset = 0.001
+
+//Power 
+Power_Rating = 30
+Power = 30
+powerini = 0
+power_step_size = 0
+
+Power_Programming_Error_Offset = 0.005
+Power_Programming_Error_Gain = 0.005
+Power_Readback_Error_Offset = 0.005
+Power_Readback_Error_Gain = 0.005
+
+//Voltage & Current Settings
+Voltage_Rating = 210
+Current_Rating = 5
+minCurrent = 1
+maxCurrent = 1
+current_step_size = 1
+minVoltage = 1
+maxVoltage = 10
+voltage_step_size = 0.5
+
+
+//DMM Settings (Default Hardcoded in GUI.py)
+Range = Auto
+Aperture = 0.2
+AutoZero = ON
+//Auto - ON, 10M - OFF
+inputZ = ON
+UpTime = 50
+DownTime = 50
+
+//Oscilloscope Settings
+OSC_Channel = 1
+V_Settling_Band = 0.8
+T_Settling_Band = 0.001
+//===============================X1,X10,X20,X100
+Probe_Setting = X10
+//===============================NORMal,PEAK,AVERage,HRESolution	
+Acq_Type = AVERage	
+Channel_CouplingMode = AC	
+Trigger_CouplingMode = DC
+//===============================EDGE,IIC,EBUR
+Trigger_Mode = EDGE	
+//===============================NORMAL,AUTO	
+Trigger_SweepMode = NORMAL	
+//===============================ALT,POS,NEG,EITH
+Trigger_SlopeMode = EITH
+TimeScale = 0.01
+VerticalScale = 0.00001
