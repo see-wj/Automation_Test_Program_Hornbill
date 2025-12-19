@@ -4,7 +4,7 @@ V_Rating,32
 I_Rating,10
 P_Rating,160
 power,160
-estimatetime,120.0
+estimatetime,0
 updatedelay,3.0
 readbackvoltage,0
 readbackcurrent,0
@@ -19,7 +19,7 @@ minCurrent,1
 maxCurrent,3
 current_step_size,1
 minVoltage,1
-maxVoltage,10
+maxVoltage,3
 voltage_step_size,1
 selected_DUT,Dolphin
 PSU,USB0::0x2A8D::0xCC04::CN10000021::0::INSTR

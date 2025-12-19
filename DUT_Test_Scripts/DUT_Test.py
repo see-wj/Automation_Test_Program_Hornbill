@@ -200,7 +200,7 @@ class NewVoltageMeasurement:
         Configure(dict["DMM"]).write("Voltage")
         Trigger(dict["DMM"]).setSource("BUS")
         Sense(dict["DMM"]).setVoltageResDC(dict["VoltageRes"])
-        Function(dict["ELoad"]).setMode(dict["setFunction"])
+        Function(dict["ELoad"]).setMode("Current")
         Function(dict["PSU"]).setMode("Voltage")
 
         #Instrument Channel Set
@@ -321,15 +321,12 @@ class NewVoltageMeasurement:
                 sleep(float(self.updatedelay))
 
                 #Readback Voltage and Current
-                temp_values = Measure(dict["PSU"]).multipleChannelQuery(ch,"VOLT")
+                temp_values = float(Measure(dict["PSU"]).multipleChannelQuery(ch,"VOLT"))
                 WAI(dict["PSU"])
                 temp_values2 = Measure(dict["PSU"]).multipleChannelQuery(ch,"CURR")
                 WAI(dict["PSU"])
                 sleep(1)
                 self.dataList2.insert(k, [float(temp_values), float(temp_values2)])
-
-                if worker is not None:
-                    worker.new_data.emit(float(temp_values), float(temp_values2))
                 
                 #INIT DMM (Trigger Measurement)
                 Initiate(dict["DMM"]).initiate()
@@ -365,6 +362,11 @@ class NewVoltageMeasurement:
                             k, [voltagemeasured , 0]
                         )
                         break
+
+                if worker is not None:
+                    worker.new_data.emit(voltagemeasured - V, temp_values - voltagemeasured)
+   
+                      
                 WAI(dict["DMM"])
 
                 #Increment of Steps

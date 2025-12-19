@@ -6,6 +6,12 @@ import traceback
 import os
 import pyvisa
 
+import time #Shamman changes
+import csv  #Shamman changes
+import ipaddress #Shamman changes
+
+import datetime
+
 import pyqtgraph as pg
 from io import StringIO
 from PIL import Image, ImageDraw, ImageFont
@@ -248,7 +254,8 @@ def GetVisaSCPIResources():
             continue
 
     return available_visa_ids, available_names, instrument_roles
-def NewGetVisaSCPIResources():
+
+'''def NewGetVisaSCPIResources():  #Keep first
     """Use to auto sort the Visa Address to PSU, ELoad... when it match the name in model_role_map"""
     # Initialize VISA resource manager
     rm = pyvisa.ResourceManager()
@@ -284,7 +291,163 @@ def NewGetVisaSCPIResources():
             #print(f"Error with resource {res}: {e}")
             continue  # Continue checking the next resource if there's an error
 
-    return availableVisaIdList, availableNameList, instrument_roles
+    return availableVisaIdList, availableNameList, instrument_roles'''
+
+def GetVisaTCPIPResources():  #Shamman changes
+    """Return TCPIP (IP-based) VISA instruments and map them to roles using the existing role map."""
+    rm = pyvisa.ResourceManager()
+    resource_list = rm.list_resources()
+
+    available_visa_ids = []
+    available_names = []
+    instrument_roles = {}
+
+    # Use your existing role map function
+    model_role_map = load_model_role_map()  # no changes here
+
+    for resource in resource_list:
+        # Step 1: Must start with TCPIP
+        if not resource.startswith("TCPIP"):
+            continue
+
+        # Step 2: Extract address
+        try:
+            address = resource.split("::")[1]
+        except IndexError:
+            continue  # malformed string
+
+        # Step 3: Only keep true IP addresses, skip hostnames
+        try:
+            ipaddress.ip_address(address)
+        except ValueError:
+            continue  # skip hostname or malformed resource
+
+        # Step 4: Open resource and query IDN
+        try:
+            instrument = rm.open_resource(resource)
+            instrument.timeout = 2000
+
+            idn = instrument.query("*IDN?").strip().upper()
+
+            if idn and "," in idn:
+                available_visa_ids.append(resource)
+                available_names.append(idn)
+
+                # Assign role using your existing role map
+                for model, role in model_role_map.items():
+                    if model in idn:
+                        instrument_roles[role] = resource
+                        break
+
+                print(f"[TCPIP-IP] {resource} → {idn}")
+
+        except pyvisa.errors.VisaIOError as e:
+            if e.error_code in (-1073807343, -1073807339, -1073807298):
+                continue
+            else:
+                print(f"VISA I/O Error ({e.error_code}) on {resource}: {e}")
+        except Exception as e:
+            print(f"Unexpected error on {resource}: {e}")
+
+    return available_visa_ids, available_names, instrument_roles
+
+def GetVisaHostnameResources():   #Shamman changes
+    """Return TCPIP VISA instruments that use hostnames (not raw IP addresses)."""
+
+    rm = pyvisa.ResourceManager()
+    resource_list = rm.list_resources()
+
+    available_visa_ids = []
+    available_names = []
+    instrument_roles = {}
+
+    model_role_map = load_model_role_map()
+
+    for resource in resource_list:
+        # Only TCPIP instruments
+        if not resource.startswith("TCPIP"):
+            continue
+
+        try:
+            address = resource.split("::")[1]
+        except IndexError:
+            continue  # malformed VISA string
+
+        # Skip pure IP-based addresses
+        try:
+            ipaddress.ip_address(address)
+            continue  # valid IP → not hostname
+        except ValueError:
+            pass  # hostname → OK
+
+        try:
+            inst = rm.open_resource(resource)
+            inst.timeout = 3000
+
+            idn = inst.query("*IDN?").strip().upper()
+
+            if idn and "," in idn:
+                available_visa_ids.append(resource)
+                available_names.append(idn)
+
+                # Match model to role
+                for model, role in model_role_map.items():
+                    if model in idn:
+                        instrument_roles[role] = resource
+                        break
+
+                print(f"[HOSTNAME] {resource} → {idn}")
+
+        except pyvisa.errors.VisaIOError as e:
+            # Ignore common VISA timeouts / disconnects
+            if e.error_code in (-1073807343, -1073807339, -1073807298):
+                continue
+            print(f"VISA error on {resource}: {e}")
+
+        except Exception as e:
+            print(f"Unexpected error on {resource}: {e}")
+
+    return available_visa_ids, available_names, instrument_roles
+
+def ScanSelectedVisaResources(self):
+    visa_ids = []
+    names = []
+    roles = {}
+
+    if self.QCheckBox_USB_Widget.isChecked():
+        ids, nms, rls = GetVisaSCPIResources()
+        visa_ids += ids
+        names += nms
+        roles.update(rls)
+
+    if self.QCheckBox_IP_Widget.isChecked():
+        ids, nms, rls = GetVisaTCPIPResources()
+        visa_ids += ids
+        names += nms
+        roles.update(rls)
+
+    if self.QCheckBox_Hostname_Widget.isChecked():
+        ids, nms, rls = GetVisaHostnameResources()
+        visa_ids += ids
+        names += nms
+        roles.update(rls)
+
+    return visa_ids, names, roles
+
+def classify_visa_resource(visa_id):   #Shamman changes (makes program slower due to scanning)
+    if visa_id.startswith("USB"):
+        return "USB"
+
+    if visa_id.startswith("TCPIP"):
+        address = visa_id.split("::")[1]
+        try:
+            import ipaddress
+            ipaddress.ip_address(address)
+            return "TCPIP_IP"
+        except ValueError:
+            return "TCPIP_HOSTNAME"
+
+    return "OTHER"
 
 # Scroll Area
 def scroll_area(self,layout):
@@ -670,8 +833,7 @@ class VoltageMeasurementDialog(QDialog):
         self.IMAGE_PATH = "C:/PyVisa - Copy  - Excavator - Copy/PyVisa/images/Chart.png"
         self.ERROR_CSV_PATH = "C:/PyVisa - Copy  - Excavator - Copy/PyVisa/Executable/GUI/error.csv"
         self.image_dialog = None
-        
-
+    
         self.Power_Rating = "6000"
         self.Current_Rating = "24"
         self.Voltage_Rating = "800"
@@ -8887,7 +9049,27 @@ class VoltageCalibrationDialog(QDialog):
         self.worker.log.connect(self.append_log)
         self.worker.finished.connect(self.on_finished)
         self.worker.error.connect(self.on_error)
-        self.worker.start()
+
+        '''# Create crash-safe CSV
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  #Shamman changes
+        self.live_csv_path = os.path.join(
+            self.params.savelocation,
+            f"live_voltage_data_{timestamp}.csv"
+        )
+
+        self.csv_file = open(self.live_csv_path, "w", newline="")
+        self.csv_writer = csv.writer(self.csv_file)
+
+        # Write header
+        self.csv_writer.writerow([
+            "Index",
+            "Timestamp",
+            "Programming_V",
+            "Readback_V"
+        ])
+        self.csv_file.flush()
+
+        self.worker.start()'''
 
     def on_stop(self):
         if self.worker:
@@ -10577,6 +10759,7 @@ class Parameters:
 
         return config_data
 
+
 class AllTestMeasurement(QDialog):
     """Class for configuring the voltage measurement DUT Tests Dialog.
     A widget is declared for each parameter that can be customized by the user. These widgets can come in
@@ -10595,6 +10778,9 @@ class AllTestMeasurement(QDialog):
         self.params = Parameters()
 
         self.plot_widget = pg.PlotWidget(title="Voltage Accuracy")
+        self.plot_widget.enableAutoRange(axis = 'x', enable = True)
+        self.plot_widget.enableAutoRange(axis = 'y', enable = True)
+        self.plot_widget.setAutoVisible(y=True)
         #Two Curves : Programing V(red), Readback V(blue)
         self.programming_curve = self.plot_widget.plot(pen=pg.mkPen(color='r', width=5), name="Programming Voltage")
         self.readback_curve = self.plot_widget.plot(pen=pg.mkPen(color='b', width=5), name="Readback Voltage")
@@ -10682,7 +10868,7 @@ class AllTestMeasurement(QDialog):
         self.QCheckBox_OCP_Test_Widget.setCheckState(Qt.Unchecked)
         
         #Create Bundle test view
-        self.setWindowTitle("Bundle Test")
+        self.setWindowTitle("BUNDLE TEST")
         self.image_window = None
         self.setWindowFlags(Qt.Window)
         font = QFont()
@@ -10762,6 +10948,7 @@ class AllTestMeasurement(QDialog):
 
         # Connections section
         self.image_label = QLabel()
+        QLabel_Connection_Selection = QLabel()
         QLabel_PSU_VisaAddress = QLabel()
         QLabel_DMM_VisaAddressforVoltage = QLabel()
         self.QLabel_DMM_VisaAddressforCurrent = QLabel()
@@ -10771,6 +10958,7 @@ class AllTestMeasurement(QDialog):
         QLabel_DUT = QLabel()
         QLabel_AC_Supply_Type = QLabel()
 
+        QLabel_Connection_Selection.setText("Connection Selection:")
         QLabel_PSU_VisaAddress.setText("Visa Address (PSU):")
         QLabel_DMM_VisaAddressforVoltage.setText("Visa Address (DMM-Voltage):")
         self.QLabel_DMM_VisaAddressforCurrent.setText("Visa Address (DMM-Current Shunt):")
@@ -11051,7 +11239,7 @@ class AllTestMeasurement(QDialog):
         Checkbox_row.addWidget(self.QCheckBox_USB_Widget)
         Checkbox_row.addWidget(self.QCheckBox_IP_Widget)
         Checkbox_row.addWidget(self.QCheckBox_Hostname_Widget)
-        Connection_layout.addRow(Checkbox_row)
+        Connection_layout.addRow(QLabel_Connection_Selection, Checkbox_row)
         Connection_layout.addRow(QLabel_DUT, self.QComboBox_DUT)
         Connection_layout.addRow(QLabel_AC_Supply_Type, self.QComboBox_AC_Supply_Type)
         Connection_layout.addRow(QLabel_PSU_VisaAddress, self.QLineEdit_PSU_VisaAddress)
@@ -11158,11 +11346,6 @@ class AllTestMeasurement(QDialog):
         self.oscilloscope_form.addRow(self.QCheckBox_SpecialCase_Widget)
         self.oscilloscope_form.addRow(self.QCheckBox_NormalCase_Widget)
 
-
-        """#Oscilloscope Case Condition
-        self.case_group = QGroupBox()
-        self.QCheckBox_SpecialCase_Widget.setText("Special Case (0% <-> 100%)")
-        self.QCheckBox_NormalCase_Widget.setText("Normal Case (50% <-> 100%)")"""
 
         """#Transient Recovery Test conditions
         self.performtest_widget = QGroupBox()
@@ -11374,20 +11557,31 @@ class AllTestMeasurement(QDialog):
             self.OutputBox.append("Stop requested, waiting for worker to finish...")
     
     def update_plot(self, programming_v, readback_v):
-        self.counter += 1
-        self.x_data.append(self.counter)
-        self.prog_data.append(programming_v)
-        self.read_data.append(readback_v)
+        
+        self.params.counter += 1 
+        self.params.x_data.append(self.params.counter)
+        self.params.prog_data.append(programming_v)
+        self.params.read_data.append(readback_v)
 
         #keep only the latest 100 points for better performance
-        if len(self.x_data) > 100:
-            self.x_data = self.x_data[-100:]
-            self.prog_data = self.prog_data[-100:]
-            self.read_data = self.read_data[-100:]
+        if len(self.params.x_data) > 100:
+            self.params.x_data = self.params.x_data[-100:]
+            self.params.prog_data = self.params.prog_data[-100:]
+            self.params.read_data = self.params.read_data[-100:]
         
-        self.programming_curve.setData(self.x_data, self.prog_data)
-        self.readback_curve.setData(self.x_data, self.read_data)
-    
+        self.programming_curve.setData(self.params.x_data, self.params.prog_data)
+        self.readback_curve.setData(self.params.x_data, self.params.read_data)
+
+        # ✅ WRITE CSV ROW HERE  #Shamman changes
+        if self.csv_writer:
+            self.data_index += 1
+            self.csv_writer.writerow([
+                self.data_index,
+                programming_v,
+                readback_v
+            ])
+            self.csv_file.flush()
+
     def update_status(self, message):
         self.OutputBox.append(message)
     
@@ -11490,7 +11684,7 @@ class AllTestMeasurement(QDialog):
     def rshunt_changed(self, value):
         self.params.rshunt = value
 
-    def doFind(self):
+    '''def doFind(self):
         try:
             # Clear GUI fields
             self.QLineEdit_PSU_VisaAddress.clear()
@@ -11499,11 +11693,24 @@ class AllTestMeasurement(QDialog):
             self.QLineEdit_OSC_VisaAddress.clear()
             self.QLineEdit_ELoad_VisaAddress.clear()
 
-            self.visaIdList, self.nameList, instrument_roles = NewGetVisaSCPIResources()
+            self.visaIdList, self.nameList, instrument_roles = ScanSelectedVisaResources(self)
 
             for i in range(len(self.nameList)):
-                visa_id = str(self.visaIdList[i])
+                #Shamman changes (filter out the unwanted connected devices, however this makes the program slow)
+                visa_id = str(self.visaIdList[i]) 
+                
+                visa_type = classify_visa_resource(visa_id)
 
+                if visa_type == "USB" and not self.QCheckBox_USB_Widget.isChecked():
+                    continue
+
+                if visa_type == "TCPIP_IP" and not self.QCheckBox_IP_Widget.isChecked():
+                    continue
+
+                if visa_type == "TCPIP_HOSTNAME" and not self.QCheckBox_Hostname_Widget.isChecked():
+                    continue
+
+                #Shamman changes
                 # Determine type of VISA address
                 if visa_id.startswith("USB") and not self.QCheckBox_USB_Widget.isChecked():
                     continue  # skip USB if checkbox not checked
@@ -11535,8 +11742,49 @@ class AllTestMeasurement(QDialog):
 
         except Exception as e:
             self.OutputBox.append("No Devices Found!!! " + str(e))
-        return   
+        return'''
+    
+    def doFind(self):       #Shamman changes
+        try:
+            # Clear GUI fields
+            self.QLineEdit_PSU_VisaAddress.clear()
+            self.QLineEdit_DMM_VisaAddressforVoltage.clear()
+            self.QLineEdit_DMM_VisaAddressforCurrent.clear()
+            self.QLineEdit_OSC_VisaAddress.clear()
+            self.QLineEdit_ELoad_VisaAddress.clear()
+            self.OutputBox.clear()
 
+            # 🔑 Call the dispatcher
+            self.visaIdList, self.nameList, instrument_roles = ScanSelectedVisaResources(self)
+
+            for visa_id, name in zip(self.visaIdList, self.nameList):
+                self.OutputBox.append(f"{name}  {visa_id}")
+
+                self.QLineEdit_PSU_VisaAddress.addItem(visa_id)
+                self.QLineEdit_OSC_VisaAddress.addItem(visa_id)
+                self.QLineEdit_DMM_VisaAddressforVoltage.addItem(visa_id)
+                self.QLineEdit_DMM_VisaAddressforCurrent.addItem(visa_id)
+                self.QLineEdit_ELoad_VisaAddress.addItem(visa_id)
+
+            # Auto-assign roles
+            role_widget_map = {
+                'PSU': self.QLineEdit_PSU_VisaAddress,
+                'ELOAD': self.QLineEdit_ELoad_VisaAddress,
+                'DMM': self.QLineEdit_DMM_VisaAddressforVoltage,
+                'DMM2': self.QLineEdit_DMM_VisaAddressforCurrent,
+                'SCOPE': self.QLineEdit_OSC_VisaAddress
+            }
+
+            for role, visa in instrument_roles.items():
+                if role in role_widget_map and visa in self.visaIdList:
+                    idx = self.visaIdList.index(visa)
+                    role_widget_map[role].setCurrentIndex(idx)
+
+        except Exception as e:
+            self.OutputBox.append("No Devices Found!!! " + str(e))
+        return
+
+    
     def updatedelay_changed(self, value):
         self.params.updatedelay = value
 
@@ -12141,6 +12389,8 @@ class AllTestMeasurement(QDialog):
                 "InputZ":self.params.inputZ,
                 "UpTime":self.params.UpTime,
                 "DownTime":self.params.DownTime,
+
+             
             }
 
             #Parameters to be check if specific test was selected
@@ -12264,6 +12514,25 @@ class AllTestMeasurement(QDialog):
                     self.abort_button.setVisible(True)
                     self.abort_button.setEnabled(True)
                     self.QPushButton_Widget1.setEnabled(False)
+
+                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")  #Shamman changes
+                    csv_path = os.path.join(
+                        self.params.savelocation,
+                        f"realtime_voltage_data_{timestamp}.csv"
+                    )
+
+                    self.csv_file = open(csv_path, "w", newline="")
+                    self.csv_writer = csv.writer(self.csv_file)
+
+                    # Header row
+                    self.csv_writer.writerow([
+                        "Index",
+                        "Programming_Voltage",
+                        "Readback_Voltage"
+                    ])
+                    self.csv_file.flush()
+
+                    self.data_index = 0
                                             
                     # Create and start worker
                     self.worker = None
@@ -12273,7 +12542,7 @@ class AllTestMeasurement(QDialog):
                     self.worker.progress_value.connect(self.update_progress_bar)
                     self.worker.finished.connect(self.test_finished)
                     self.worker.aborted.connect(self.test_aborted)
-                    self.worker.error.connect(lambda e, tb: show_error_dialog(self, e, tb))
+                    self.worker.error.connect(self.handle_test_error)  #Shamman changes -> original is self.worker.error.connect(lambda e, tb: show_error_dialog(self, e, tb))
                     self.worker.new_data.connect(self.update_plot)
                     self.worker.progress.connect(self.update_status)
                     self.worker.error.connect(self.show_error)
@@ -12321,6 +12590,41 @@ class AllTestMeasurement(QDialog):
             self.worker.wait(2000)
             self.test_aborted()
 
+    def cleanup_test(self, reason="unknown"):       #Shamman changes under maintenance
+        print(f"Cleaning up test due to: {reason}")
+
+        # Close CSV safely
+        if hasattr(self, "csv_file") and self.csv_file:
+            try:
+                self.csv_file.flush()
+                self.csv_file.close()
+            except Exception as e:
+                print("CSV cleanup error:", e)
+
+            self.csv_file = None
+            self.csv_writer = None
+
+        # Reset instruments (never crash cleanup)
+        try:
+            RESET.ResetInstrument(self, self.dict_reset)
+        except Exception as e:
+            print("Reset failed during cleanup:", e)
+
+        # Clean up worker
+        if self.worker:
+            self.worker.deleteLater()
+            self.worker = None
+
+    #Triggers when program experience crash
+    def handle_test_error(self, exception, traceback_str):    #Shamman changes
+        # Show error (same behavior as before)
+        show_error_dialog(self, exception, traceback_str)
+
+        # Log in output box (optional)
+        self.OutputBox.append("❌ Test crashed due to an error")
+
+        # Perform the SAME cleanup as abort
+        self.cleanup_test(reason="crash")
 
     def test_finished(self):
         """Called when the test finishes (completed or aborted)"""
@@ -12354,6 +12658,12 @@ class AllTestMeasurement(QDialog):
                  
         print("Test operation finished")
 
+        if hasattr(self, "csv_file"):   #Shamman changes
+            try:
+                self.csv_file.close()
+            except:
+                pass
+
     def test_aborted(self):
         """Called when the test is aborted"""
         # Hide progress elements
@@ -12367,7 +12677,12 @@ class AllTestMeasurement(QDialog):
         # Show abort message
         self.OutputBox.append("Test operation aborted ❌")
 
-        RESET.ResetInstrument(self,self.dict_reset)
+        self.cleanup_test(reason="aborted") #Shamman changes 
+
+        try:   #Shamman changes
+            RESET.ResetInstrument(self, self.dict_reset)
+        except Exception as e:
+            print("Reset failed during abort:", e)
 
         # Clean up worker
         if self.worker:
@@ -12375,6 +12690,16 @@ class AllTestMeasurement(QDialog):
             self.worker = None
         
         print("Test operation aborted")
+
+        if hasattr(self, "csv_file") and self.csv_file:  #Shamman changes
+            try:
+                self.csv_file.flush()
+                self.csv_file.close()
+            except Exception as e:
+                print("CSV close error:", e)
+
+            self.csv_file = None
+            self.csv_writer = None
 
 class TestWorker(QThread):
     progress = pyqtSignal(str)
@@ -12401,6 +12726,7 @@ class TestWorker(QThread):
 
         self.was_aborted = False
         self.force_exit = False   # ✅ Add this line
+
 
     def run(self):
         try:
@@ -12589,6 +12915,14 @@ class TestWorker(QThread):
             self.error.emit(e, tb)
         finally:
             self.finished.emit()
+
+        try:        #Shamman changes
+            # main test loop
+            ...
+        except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
+            self.error.emit(e, tb)
 
 class AdvancedSettings(QDialog):
     """This class is to configure the Advanced Settings when conducting voltage measurements,
