@@ -2033,7 +2033,7 @@ class CurrentMeasurementDialog(QDialog):
         QCheckBox_Lock_Widget = QCheckBox()
         QCheckBox_Lock_Widget.setText("Lock Widget")
 
-        # Shamman changes
+        #Shamman changes
         self.QCheckBox_Current_Accuracy_FULL_Widget = QCheckBox()
         self.QCheckBox_Current_Accuracy_FULL_Widget.setText("Current at full")
         self.QCheckBox_Current_Accuracy_FULL_Widget.setCheckState(Qt.Checked)
@@ -9371,6 +9371,8 @@ class MultiThreadVoltageMeasurementDialog(QDialog):
         #Two Curves : Programing V(red), Readback V(blue)
         self.programming_curve = self.plot_widget.plot(pen=pg.mkPen(color='r', width=5), name="Programming Voltage")
         self.readback_curve = self.plot_widget.plot(pen=pg.mkPen(color='b', width=5), name="Readback Voltage")
+        self.prog_up_bound = self.plot_widget.plot(pen=pg.mkPen(color='y', width=5), name="Upper Boundary Limit")
+        self.prog_low_bound = self.plot_widget.plot(pen=pg.mkPen(color='y', width=5), name="Lower Boundary Limit")
 
         self.x_data = []
         self.prog_data = []
@@ -10690,6 +10692,8 @@ class Parameters:
         self.x_data = []
         self.prog_data = []
         self.read_data = []
+        self.up_data = []
+        self.low_data = []
         self.counter = 0
 
         self.load_data()
@@ -10776,7 +10780,7 @@ class AllTestMeasurement(QDialog):
     def __init__(self):
         super().__init__()
         self.params = Parameters()
-
+        #Shamman changes    #Can be used for current 
         self.plot_widget = pg.PlotWidget(title="Voltage Accuracy")
         self.plot_widget.enableAutoRange(axis = 'x', enable = True)
         self.plot_widget.enableAutoRange(axis = 'y', enable = True)
@@ -10784,6 +10788,12 @@ class AllTestMeasurement(QDialog):
         #Two Curves : Programing V(red), Readback V(blue)
         self.programming_curve = self.plot_widget.plot(pen=pg.mkPen(color='r', width=5), name="Programming Voltage")
         self.readback_curve = self.plot_widget.plot(pen=pg.mkPen(color='b', width=5), name="Readback Voltage")
+        self.prog_up_bound = self.plot_widget.plot(pen=pg.mkPen(color='y', width=5), name="Upper Boundary Limit")
+        self.prog_low_bound = self.plot_widget.plot(pen=pg.mkPen(color='y', width=5), name="Lower Boundary Limit")
+        self.last_Iset = None               #Shamman changes
+        self.fail_prompt_active = False
+        self._paused = False
+        self._running = True
 
         #Create find button 
         self.QPushButton_Widget0 = QPushButton()
@@ -10880,6 +10890,10 @@ class AllTestMeasurement(QDialog):
         self.abort_button.clicked.connect(self.abort_test)
         self.abort_button.setVisible(False)
         self.abort_button.setEnabled(False)
+        self.show_plot_button = QPushButton("Show Plot")        #Shamman changes 
+        self.show_plot_button.clicked.connect(self.show_popup_plot)
+        self.show_plot_button.setVisible(False)
+        self.show_plot_button.setEnabled(False)
 
         # Progress bar NEEDS FIXING!
         self.progress_bar = QProgressBar()
@@ -10960,7 +10974,7 @@ class AllTestMeasurement(QDialog):
 
         QLabel_Connection_Selection.setText("Connection Selection:")
         QLabel_PSU_VisaAddress.setText("Visa Address (PSU):")
-        QLabel_DMM_VisaAddressforVoltage.setText("Visa Address (DMM-Voltage):")
+        QLabel_DMM_VisaAddressforVoltage.setText("Visa Address (DMM):")
         self.QLabel_DMM_VisaAddressforCurrent.setText("Visa Address (DMM-Current Shunt):")
         self.QLabel_OSC_VisaAddress.setText("Visa Address (OSC):")
         QLabel_ELoad_VisaAddress.setText("Visa Address (ELoad):")
@@ -10976,8 +10990,7 @@ class AllTestMeasurement(QDialog):
         self.QComboBox_DMM_Instrument = QComboBox()
         self.QComboBox_DUT = QComboBox()
         self.QComboBox_AC_Supply_Type = QComboBox()
-
-        # General Settings
+        # General Setting
         QLabel_Voltage_Res = QLabel()
         QLabel_set_PSU_Channel = QLabel()
         QLabel_set_ELoad_Channel = QLabel()
@@ -10988,7 +11001,6 @@ class AllTestMeasurement(QDialog):
         QLabel_OCP_Activation_Time = QLabel()
         QLabel_SPOperationMode = QLabel()
         QLabel_Line_Reg_Range = QLabel()
-
         #Programming Error
         QLabel_Programming_Error_Gain = QLabel()
         QLabel_Programming_Error_Offset = QLabel()
@@ -11372,10 +11384,11 @@ class AllTestMeasurement(QDialog):
         exec_layout.addRow(QPushButton_Widget2)
         exec_layout.addRow(self.QPushButton_Widget1)  
         exec_layout.addRow(self.abort_button) 
+        exec_layout.addRow(self.show_plot_button)
 
         exec_layout_box.addLayout(exec_layout)
  
-        Right_container.addLayout(save_path_layout)
+        Right_container.addLayout(save_path_layout)         #Need changes
         Right_container.addLayout(exec_layout_box)
         Right_container.addWidget(self.plot_widget)
 
@@ -11487,8 +11500,6 @@ class AllTestMeasurement(QDialog):
         self.QLineEdit_Programming_Response_Down_NoLoad.textEdited.connect(self.Programming_Response_Down_NoLoad_changed)
         self.QLineEdit_Programming_Response_Down_FullLoad.textEdited.connect(self.Programming_Response_Down_FullLoad_changed)
 
-        #Oscilloscope Settings
-        
         #Voltage/Current/Power changed
         self.QLineEdit_current_rated.textEdited.connect(self.Current_Rating_changed)
         self.QLineEdit_voltage_rated.textEdited.connect(self.Voltage_Rating_changed)
@@ -11556,31 +11567,108 @@ class AllTestMeasurement(QDialog):
             self.worker.request_stop()
             self.OutputBox.append("Stop requested, waiting for worker to finish...")
     
-    def update_plot(self, programming_v, readback_v):
-        
+    def update_plot(self, Vset, Iset, V_prog, V_read, I_read, prog_verror, read_verror, prog_percent, read_percent, prog_upper_bound, prog_lower_bound, read_upper_bound, read_lower_bound):
+        #Shamman changes 
         self.params.counter += 1 
         self.params.x_data.append(self.params.counter)
-        self.params.prog_data.append(programming_v)
-        self.params.read_data.append(readback_v)
+        self.params.prog_data.append(prog_verror)
+        self.params.read_data.append(read_verror)
+        self.params.up_data.append(prog_upper_bound)
+        self.params.low_data.append(prog_lower_bound)
 
         #keep only the latest 100 points for better performance
         if len(self.params.x_data) > 100:
             self.params.x_data = self.params.x_data[-100:]
             self.params.prog_data = self.params.prog_data[-100:]
             self.params.read_data = self.params.read_data[-100:]
+            self.params.up_data = self.params.up_data[-100:]
+            self.params.low_data = self.params.low_data[-100:]
         
         self.programming_curve.setData(self.params.x_data, self.params.prog_data)
         self.readback_curve.setData(self.params.x_data, self.params.read_data)
+        self.prog_up_bound.setData(self.params.x_data, self.params.up_data)
+        self.prog_low_bound.setData(self.params.x_data, self.params.low_data)
 
-        # ✅ WRITE CSV ROW HERE  #Shamman changes
+        # ✅ WRITE CSV ROW HERE  #Shamman changes (Note that percentage error boundary is bounded to 100 and -100)
         if self.csv_writer:
             self.data_index += 1
             self.csv_writer.writerow([
                 self.data_index,
-                programming_v,
-                readback_v
+                Vset,
+                Iset,
+                V_prog,
+                V_read,
+                I_read,
+                prog_verror,
+                read_verror,
+                prog_percent,
+                read_percent,
+                prog_upper_bound,
+                prog_lower_bound,  
+                read_upper_bound,
+                read_lower_bound
             ])
             self.csv_file.flush()
+
+        # ---- CURRENT BLOCK DIVIDER ----   #Shamman changes
+        if self.last_Iset is None or abs(Iset - self.last_Iset) > 1e-6:
+            self.OutputBox.append(
+                f"<br><b>===== Current Set: {Iset:.0f}A =====</b>"
+            )
+            self.last_Iset = Iset
+
+        # determine pass/fail
+        PASS = (
+            prog_lower_bound <= prog_verror <= prog_upper_bound
+            and
+            read_lower_bound <= read_verror <= read_upper_bound
+        )
+
+        status = "Pass" if PASS else "Fail"
+
+        log_line = f"[{self.data_index}] {Iset:.0f}A : {Vset:.0f}V : {status}"
+        
+        color = "green" if PASS else "red"
+        self.OutputBox.append(f'<span style="color:{color};">{log_line}</span>')
+
+        if not PASS and not self.fail_prompt_active:
+            self.fail_prompt_active = True
+
+            self.worker.pause()  # pause test loop
+            self.handle_test_failure()
+
+    def handle_test_failure(self):
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Warning)
+        msg.setWindowTitle("Test Failure Detected")
+
+        msg.setText("A test point failure has been detected.")
+
+        ignore_btn = msg.addButton("Ignore and Continue", QMessageBox.AcceptRole)
+        terminate_btn = msg.addButton("Terminate Test", QMessageBox.RejectRole)
+
+        msg.exec_()
+
+        if msg.clickedButton() == ignore_btn:
+            self.fail_prompt_active = False
+            self.worker.resume()
+            self.OutputBox.append(
+                "<span style='color:orange;'>⚠ Failure ignored by operator — test resumed</span>"
+            )
+        elif msg.clickedButton() == terminate_btn:
+            self.worker.stop()
+            self.OutputBox.append(
+                "<span style='color:red;'>⛔ Test terminated by operator</span>"
+            )
+
+    def pause(self):
+        self._paused = True
+
+    def resume(self):
+        self._paused = False
+
+    def stop(self):
+        self._running = False
 
     def update_status(self, message):
         self.OutputBox.append(message)
@@ -11683,66 +11771,6 @@ class AllTestMeasurement(QDialog):
     
     def rshunt_changed(self, value):
         self.params.rshunt = value
-
-    '''def doFind(self):
-        try:
-            # Clear GUI fields
-            self.QLineEdit_PSU_VisaAddress.clear()
-            self.QLineEdit_DMM_VisaAddressforVoltage.clear()
-            self.QLineEdit_DMM_VisaAddressforCurrent.clear()
-            self.QLineEdit_OSC_VisaAddress.clear()
-            self.QLineEdit_ELoad_VisaAddress.clear()
-
-            self.visaIdList, self.nameList, instrument_roles = ScanSelectedVisaResources(self)
-
-            for i in range(len(self.nameList)):
-                #Shamman changes (filter out the unwanted connected devices, however this makes the program slow)
-                visa_id = str(self.visaIdList[i]) 
-                
-                visa_type = classify_visa_resource(visa_id)
-
-                if visa_type == "USB" and not self.QCheckBox_USB_Widget.isChecked():
-                    continue
-
-                if visa_type == "TCPIP_IP" and not self.QCheckBox_IP_Widget.isChecked():
-                    continue
-
-                if visa_type == "TCPIP_HOSTNAME" and not self.QCheckBox_Hostname_Widget.isChecked():
-                    continue
-
-                #Shamman changes
-                # Determine type of VISA address
-                if visa_id.startswith("USB") and not self.QCheckBox_USB_Widget.isChecked():
-                    continue  # skip USB if checkbox not checked
-                if visa_id.startswith("TCPIP") and not self.QCheckBox_IP_Widget.isChecked():
-                    continue  # skip IP if checkbox not checked
-                if visa_id.startswith("TCPIP") and any(c.isalpha() for c in visa_id.split("::")[1]) \
-                and not self.QCheckBox_Hostname_Widget.isChecked():
-                    continue  # skip hostname if checkbox not checked
-
-                # Add to GUI
-                self.OutputBox.append(str(self.nameList[i]) + visa_id)
-                self.QLineEdit_PSU_VisaAddress.addItems([visa_id])
-                self.QLineEdit_OSC_VisaAddress.addItems([visa_id])
-                self.QLineEdit_DMM_VisaAddressforVoltage.addItems([visa_id])
-                self.QLineEdit_DMM_VisaAddressforCurrent.addItems([visa_id])
-                self.QLineEdit_ELoad_VisaAddress.addItems([visa_id])
-
-                for role, widget in [('PSU', self.QLineEdit_PSU_VisaAddress),
-                                ('ELOAD', self.QLineEdit_ELoad_VisaAddress),
-                                ('DMM', self.QLineEdit_DMM_VisaAddressforVoltage),
-                                ('DMM2', self.QLineEdit_DMM_VisaAddressforCurrent),
-                                ('SCOPE', self.QLineEdit_OSC_VisaAddress)]:
-                    if role in instrument_roles:
-                        try:
-                            index = self.visaIdList.index(instrument_roles[role])
-                            widget.setCurrentIndex(index)
-                        except ValueError:
-                            pass
-
-        except Exception as e:
-            self.OutputBox.append("No Devices Found!!! " + str(e))
-        return'''
     
     def doFind(self):       #Shamman changes
         try:
@@ -12346,6 +12374,9 @@ class AllTestMeasurement(QDialog):
             self.setEnabled(False)
             self.OutputBox.clear()
 
+            self.plot_window = VoltageAccuracyPlotWindow()      #Shamman changes
+            self.plot_window.show()
+
             #Default parameters to be check before test start
             params = {
                 "savedir":self.params.savelocation,
@@ -12513,6 +12544,8 @@ class AllTestMeasurement(QDialog):
                     self.progress_label.setVisible(True)
                     self.abort_button.setVisible(True)
                     self.abort_button.setEnabled(True)
+                    self.show_plot_button.setVisible(True)
+                    self.show_plot_button.setEnabled(True)
                     self.QPushButton_Widget1.setEnabled(False)
 
                     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")  #Shamman changes
@@ -12527,8 +12560,19 @@ class AllTestMeasurement(QDialog):
                     # Header row
                     self.csv_writer.writerow([
                         "Index",
+                        "Set_Voltage",
+                        "Set_Current", 
                         "Programming_Voltage",
-                        "Readback_Voltage"
+                        "Readback_Voltage",
+                        "Readback_Current",     #Shamman changes
+                        "Programming_Voltage_Error",
+                        "Readback_Voltage_Error",
+                        "Programming_Voltage_Percentage_Error",
+                        "Readback_Voltage_Percentage_Error",
+                        "Programming_Upper_Limit_Boundary",
+                        "Programming_Lower_Limit_Boundary",
+                        "Readback_Upper_Limit_Boundary",
+                        "Readback_lower_Limit_Boundary"
                     ])
                     self.csv_file.flush()
 
@@ -12542,10 +12586,13 @@ class AllTestMeasurement(QDialog):
                     self.worker.progress_value.connect(self.update_progress_bar)
                     self.worker.finished.connect(self.test_finished)
                     self.worker.aborted.connect(self.test_aborted)
-                    self.worker.error.connect(self.handle_test_error)  #Shamman changes -> original is self.worker.error.connect(lambda e, tb: show_error_dialog(self, e, tb))
+                    self.worker.error.connect(self.handle_test_error)  #Shamman changes made to redirect errors to new handler
                     self.worker.new_data.connect(self.update_plot)
                     self.worker.progress.connect(self.update_status)
                     self.worker.error.connect(self.show_error)
+                    self.worker.popup_data.connect(self.plot_window.popup_plot)    #Shamman changes
+                    #self.worker.fail_signal.connect(self.on_voltage_fail)
+                    #self.worker.decision_signal.connect(self.worker.receive_decision)
                     self.worker.start()
                 else:
                     print("Test canceled by user")
@@ -12590,7 +12637,7 @@ class AllTestMeasurement(QDialog):
             self.worker.wait(2000)
             self.test_aborted()
 
-    def cleanup_test(self, reason="unknown"):       #Shamman changes under maintenance
+    def cleanup_test(self, reason="unknown"):       #Shamman changes
         print(f"Cleaning up test due to: {reason}")
 
         # Close CSV safely
@@ -12634,6 +12681,9 @@ class AllTestMeasurement(QDialog):
         self.abort_button.setVisible(False)
         self.abort_button.setText("Abort")
         self.abort_button.setEnabled(False)
+        self.show_plot_button.setVisible(False)
+        self.show_plot_button.setText("Show Plot")
+        self.show_plot_button.setEnabled(False)
         self.QPushButton_Widget1.setEnabled(True)
                  
         self.OutputBox.append("Test finished ✅")
@@ -12649,7 +12699,7 @@ class AllTestMeasurement(QDialog):
                     self.image_dialog.setModal(True)
                     self.image_dialog.show()
                 except:
-                    pass  # Handle case where image window fails
+                    pass  # Handle case where image window fails`
 
         # Clean up worker
         if self.worker:
@@ -12672,6 +12722,9 @@ class AllTestMeasurement(QDialog):
         self.abort_button.setVisible(False)
         self.abort_button.setText("Abort")
         self.abort_button.setEnabled(False)
+        self.show_plot_button.setVisible(False)
+        self.show_plot_button.setText("Show Plot")
+        self.show_plot_button.setEnabled(False)
         self.QPushButton_Widget1.setEnabled(True)
         
         # Show abort message
@@ -12701,13 +12754,42 @@ class AllTestMeasurement(QDialog):
             self.csv_file = None
             self.csv_writer = None
 
+    def show_popup_plot(self):      #Shamman changes to call back the plot_window
+        self.plot_window.show()
+        self.plot_window.raise_()
+        self.plot_window.activateWindow()
+
+    '''def on_voltage_fail(self, error_value):     #Shamman changes
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Warning)
+        msg.setWindowTitle("Voltage Accuracy FAIL")
+        msg.setText(
+            f"Voltage accuracy test failed.\n\n"
+            f"Error value: {error_value:.6f} V\n\n"
+            "Do you want to continue the test?"
+        )
+        msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+
+        response = msg.exec_()
+
+        if response == QMessageBox.Yes:
+            self.worker.decision_signal.emit(True)
+        else:
+            self.worker.decision_signal.emit(False)'''
+
 class TestWorker(QThread):
     progress = pyqtSignal(str)
     progress_value = pyqtSignal(int) 
     finished = pyqtSignal()
     error = pyqtSignal(Exception, str)
     aborted = pyqtSignal() 
-    new_data = pyqtSignal(float, float)
+    new_data = pyqtSignal(float, float, float, float, float, float, float, float, float, float, float, float, float, float, float)  #Shamman changes for Vset, Iset, PSU readback voltage, and PSU readback current 
+    popup_data = pyqtSignal(float, float, float, float, float, float, float, float, float, float) #Shamman changes
+    test_failed = pyqtSignal(dict)   # send context
+    resume_test = pyqtSignal()
+    stop_test = pyqtSignal()
+    #fail_signal = pyqtSignal(float)     # send error value
+    #decision_signal = pyqtSignal(bool)  # receive Continue / Abort
 
     def __init__(self, checkbox_state, dict, params):
         super().__init__()
@@ -12727,6 +12809,9 @@ class TestWorker(QThread):
         self.was_aborted = False
         self.force_exit = False   # ✅ Add this line
 
+    '''@pyqtSlot(bool)         #Shamman changes
+    def receive_decision(self, decision):
+        self.decision = decision'''
 
     def run(self):
         try:
@@ -12804,7 +12889,7 @@ class TestWorker(QThread):
             elif self.checkbox_states["Current_Test"]:
                 #Current Accuracy Test
                 if self.checkbox_states.get("CurrentAccuracy"):
-                    if self.params["Instrument"] == "Keysight":
+                    if self.dict["Instrument"] == "Keysight":
                         for ch in self.params["PSU_Channel"]:
                             (infoList,
                             dataList,
@@ -12818,7 +12903,7 @@ class TestWorker(QThread):
                                 if self.checkbox_states["DataReport"]:
 
                                     #Export data to CSV and Graph (Refer data.py for details)
-                                    instrumentData(self.params.PSU, self.params.DMM, self.params.ELoad)
+                                    instrumentData(self.params["PSU"], self.params["DMM"], self.params["ELoad"])
                                     datatoCSV_Accuracy2(infoList, dataList, dataList2)
                                     datatoGraph2(infoList, dataList,dataList2)
                                     datatoGraph2.scatterCompareCurrent2(self, float(self.params["Programming_Error_Gain"]), float(self.params["Programming_Error_Offset"]), float(self.params["Readback_Error_Gain"]), float(self.params["Readback_Error_Offset"]), str(self.params["unit"]), float(self.params["I_Rating"]))
@@ -12830,7 +12915,7 @@ class TestWorker(QThread):
                                     df.to_csv(os.path.join(csv_folder,"config.csv"))
 
                                     #Read error,config and instrumentData files, then combine to (self.params.unit) file (Refer xlreport for details)
-                                    A = xlreport(save_directory=self.params["savedir"], file_name=str(self.params["unit"]))
+                                    A = xlreport(save_directory=self.params["savelocation"], file_name=str(self.params["unit"]))
                                     A.run()
                                     self.progress.emit("Excel Report Saved: " + str(self.params["savedir"]))
                                     self.progress.emit("")
@@ -12923,6 +13008,94 @@ class TestWorker(QThread):
             import traceback
             tb = traceback.format_exc()
             self.error.emit(e, tb)
+
+class VoltageAccuracyPlotWindow(QWidget): #Shamman changes
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Voltage Accuracy Monitor")
+        self.resize(900, 600)
+
+        self.x = []
+        self.prog_data = []
+        self.rb_data = []
+        self.prog_up_data = []
+        self.prog_low_data = []
+        self.rb_up_data = []
+        self.rb_low_data = []
+        self.prog_perc_data = []
+        self.rb_perc_data = []
+        self.perc_up_data = []
+        self.perc_low_data = []
+
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QGridLayout(self)
+
+        # Programming plot
+        self.prog_plot = pg.PlotWidget(title="Programming Voltage Absolute Error")
+        self.programming_curve = self.prog_plot.plot(pen=pg.mkPen('r', width=3))
+        self.prog_upper_boundary = self.prog_plot.plot(pen=pg.mkPen("y",width = 3))
+        self.prog_lower_boundary = self.prog_plot.plot(pen=pg.mkPen("y",width = 3))
+        layout.addWidget(self.prog_plot, 0 ,0)
+
+        # Readback plot
+        self.rb_plot = pg.PlotWidget(title="Readback Voltage Absolute Error")
+        self.readback_curve = self.rb_plot.plot(pen=pg.mkPen('b', width=3))
+        self.rb_upper_boundary = self.rb_plot.plot(pen=pg.mkPen("y",width = 3))
+        self.rb_lower_boundary = self.rb_plot.plot(pen=pg.mkPen("y",width = 3))
+        layout.addWidget(self.rb_plot, 0, 1)
+
+        # Programming Percentage Error plot
+        self.prog_perc_plot = pg.PlotWidget(title="Programming Voltage Percentage Error (%)")
+        self.programming_percentage_curve = self.prog_perc_plot.plot(pen=pg.mkPen('r', width=3))
+        self.prog_perc_upper_boundary = self.prog_perc_plot.plot(pen=pg.mkPen("y",width = 3))
+        self.prog_perc_lower_boundary = self.prog_perc_plot.plot(pen=pg.mkPen("y",width = 3))
+        layout.addWidget(self.prog_perc_plot, 1, 0)
+        
+        # Readback Percentage Error plot
+        self.rb_perc_plot = pg.PlotWidget(title="Readback Voltage Percentage Error (%)")
+        self.readback_percentage_curve = self.rb_perc_plot.plot(pen=pg.mkPen('b', width=3))
+        self.rb_perc_upper_boundary = self.rb_perc_plot.plot(pen=pg.mkPen("y",width = 3))
+        self.rb_perc_lower_boundary = self.rb_perc_plot.plot(pen=pg.mkPen("y",width = 3))      
+        layout.addWidget(self.rb_perc_plot, 1, 1)  
+
+        self.setLayout(layout)
+
+
+    @pyqtSlot(float, float, float, float, float, float, float, float, float, float)
+    def popup_plot(self, prog_err, rb_err, prog_up_bound, prog_low_bound, rb_up_bound, rb_low_bound, prog_percent, read_percent, perc_up_bound, perc_low_bound):
+        i = len(self.x)
+        self.x.append(i)
+        self.prog_data.append(prog_err)
+        self.prog_up_data.append(prog_up_bound)
+        self.prog_low_data.append(prog_low_bound)
+        self.rb_data.append(rb_err)
+        self.rb_up_data.append(rb_up_bound)
+        self.rb_low_data.append(rb_low_bound)
+        self.prog_perc_data.append(prog_percent)
+        self.rb_perc_data.append(read_percent)
+        self.perc_up_data.append(perc_up_bound)
+        self.perc_low_data.append(perc_low_bound)
+
+        self.programming_curve.setData(self.x, self.prog_data)
+        self.prog_upper_boundary.setData(self.x, self.prog_up_data)
+        self.prog_lower_boundary.setData(self.x, self.prog_low_data)
+        self.readback_curve.setData(self.x, self.rb_data)
+        self.rb_upper_boundary.setData(self.x, self.rb_up_data)
+        self.rb_lower_boundary.setData(self.x, self.rb_low_data)
+        self.programming_percentage_curve.setData(self.x, self.prog_perc_data)
+        self.prog_perc_upper_boundary.setData(self.x, self.perc_up_data)
+        self.prog_perc_lower_boundary.setData(self.x, self.perc_low_data)
+        self.readback_percentage_curve.setData(self.x, self.rb_perc_data)
+        self.rb_perc_upper_boundary.setData(self.x, self.perc_up_data)
+        self.rb_perc_lower_boundary.setData(self.x, self.perc_low_data)
+
+    def closeEvent(self, event):
+        event.ignore()   # stop Qt from destroying the window
+        self.hide()      # just hide it
+
+
 
 class AdvancedSettings(QDialog):
     """This class is to configure the Advanced Settings when conducting voltage measurements,

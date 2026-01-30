@@ -917,6 +917,9 @@ class Voltage(Subsystem):
 
     def __init__(self, VISA_ADDRESS):
         super().__init__(VISA_ADDRESS)
+    
+    def SourceVoltageLevel(self):
+        return self.instr.query("VOLT?")
 
     def setOutputVoltage(self, Value):
         self.instr.write(f"VOLT {Value}")

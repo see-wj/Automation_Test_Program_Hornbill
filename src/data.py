@@ -214,9 +214,10 @@ class datatoCSV_Accuracy2:
                     # Convert Series to DataFrames
                     columns = {
                     
-                        "PSU Readback Voltage": Vreadback,"PSU Readback Current" : Ireadback,"Load Voltage Set": Vset, "PSU Current Set": Iset,
-                        "DMM Current Measured": Imeasured, "key": Key, "Programming/Current Absolute Error (A)": ProgrammingI_error,
-                        "Relative/Current Percentage Error (%)": Ipercent_error, "PSU Readback Current Error (A)": Ireadback_error
+                        "PSU Readback Voltage": Vreadback,"PSU Readback Current" : Ireadback,
+                        "Load Voltage Set": Vset, "PSU Current Set": Iset,"DMM Current Measured": Imeasured, 
+                        "key": Key, "Programming/Current Absolute Error (A)": ProgrammingI_error, "Relative/Current Percentage Error (%)": Ipercent_error, 
+                        "PSU Readback Current Error (A)": Ireadback_error, "Relative/Current Percentage Error (%)": Ipercent_error
 
                     }
                     CSV1 = pd.DataFrame(columns)
@@ -783,6 +784,23 @@ class datatoGraph2(datatoCSV_Accuracy2):
                     ungrouped_df = pd.read_csv(DATA_CSV_PATH)
                     grouped_df = ungrouped_df.groupby("key")
 
+                    # Initialize Series for each column that will be saved to CSV
+                    upper_error_limitC = pd.Series(dtype="float64")
+                    lower_error_limitC = pd.Series(dtype="float64")
+                    conditionC = pd.Series(dtype="object")
+
+                    upper_erro_percent_limitC = pd.Series(dtype="float64")
+                    lower_erro_percent_limitC = pd.Series(dtype="float64")
+                    condition_percentC = pd.Series(dtype="object")
+
+                    upper_error_limitC2 = pd.Series(dtype="float64")
+                    lower_error_limitC2 = pd.Series(dtype="float64")
+                    conditionC2 = pd.Series(dtype="object")
+
+                    upper_erro_percent_limitC2 = pd.Series(dtype="float64")
+                    lower_erro_percent_limitC2 = pd.Series(dtype="float64")
+                    condition2_percentC = pd.Series(dtype="object")
+
                     # Initialize Series for columns to save to CSV
                     upper_error_limitC = pd.Series(dtype="float64")
                     lower_error_limitC = pd.Series(dtype="float64")
@@ -798,21 +816,42 @@ class datatoGraph2(datatoCSV_Accuracy2):
                     all_upper_error_limit2 = pd.Series(dtype="float64")
                     all_lower_error_limit2 = pd.Series(dtype="float64")
 
+                    all_upper_percent_error_limit = pd.Series(dtype="float64")
+                    all_lower_percent_error_limit = pd.Series(dtype="float64")
+                    all_upper_percent_error_limit2 = pd.Series(dtype="float64")
+                    all_lower_percent_error_limit2 = pd.Series(dtype="float64")
+
                     # Create subplots
                     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
-
+                    fig_percent, (ax3, ax4) = plt.subplots(1, 2, figsize=(12, 6))
     
                     for key, group in grouped_df:
                         Vset = group["Load Voltage Set"]
                         Iset = group["PSU Current Set"]
                         ProgrammingI_error = group["Programming/Current Absolute Error (A)"]
                         Ireadback_error = group["PSU Readback Current Error (A)"]
+                        ProgrammingI_percent_error = group["Relative/Current Percentage Error (%)"]
+                        ReadbackI_percent_error = group["PSU Readback Current Percentage Error (%)"]
 
                         # Calculate boundaries and pass/fail condition
-                        upper_error_limit = ((param1 * Iset) + (param2*Irated))
+                        upper_error_limit = ((param1 * Iset) + (param2))
                         lower_error_limit = -upper_error_limit
-                        upper_error_limit2 = ((param3 * Iset) + (param4*Irated)) 
+                        upper_error_limit2 = ((param3 * Iset) + (param4)) 
                         lower_error_limit2 = -upper_error_limit2
+
+                        #Calculate Percentage Error
+                        ProgrammingI_percent_error = (ProgrammingI_error / upper_error_limit) * 100 
+                        ReadbackI_percent_error    = (Ireadback_error / upper_error_limit) * 100
+
+                        # Append to lists so they are saved later
+                        self.ProgrammingI_percent_error_list.append(ProgrammingI_percent_error)
+                        self.ReadbackI_percent_error_list.append(ReadbackI_percent_error)
+
+                         # percentage limits (always ±100)
+                        upper_erro_percent_limit = (upper_error_limit/upper_error_limit) * 100
+                        lower_erro_percent_limit = (lower_error_limit/upper_error_limit)* 100
+                        upper_erro_percent_limit2 = (upper_error_limit/upper_error_limit)* 100
+                        lower_erro_percent_limit2 = (lower_error_limit/upper_error_limit)* 100
 
                         all_Iset = pd.concat([all_Iset, Iset])
                         all_upper_error_limit = pd.concat([all_upper_error_limit, upper_error_limit])
@@ -820,16 +859,32 @@ class datatoGraph2(datatoCSV_Accuracy2):
                         all_upper_error_limit2 = pd.concat([all_upper_error_limit2, upper_error_limit2])
                         all_lower_error_limit2 = pd.concat([all_lower_error_limit2, lower_error_limit2])
 
+                        all_upper_percent_error_limit = pd.concat([all_upper_percent_error_limit, upper_erro_percent_limit])
+                        all_lower_percent_error_limit = pd.concat([all_lower_percent_error_limit, lower_erro_percent_limit])
+                        all_upper_percent_error_limit2 = pd.concat([all_upper_percent_error_limit2, upper_erro_percent_limit2])
+                        all_lower_percent_error_limit2 = pd.concat([all_lower_percent_error_limit2, lower_erro_percent_limit2])
+
                         condition1 = ProgrammingI_error > upper_error_limit
                         condition2 = ProgrammingI_error < lower_error_limit
                         condition3 = Ireadback_error > upper_error_limit2
                         condition4 = Ireadback_error < lower_error_limit2
 
+                        condition5 = ProgrammingI_percent_error > upper_erro_percent_limit
+                        condition6 = ProgrammingI_percent_error < lower_erro_percent_limit
+                        condition7 = ReadbackI_percent_error > upper_erro_percent_limit
+                        condition8 = ReadbackI_percent_error < lower_erro_percent_limit
+
                         boolList = ["FAIL" if cond1 or cond2 else "PASS" for cond1, cond2 in zip(condition1, condition2)]
                         boolList2 = ["FAIL" if cond1 or cond2 else "PASS" for cond1, cond2 in zip(condition3, condition4)]
 
+                        boolList_percent = ["FAIL" if cond1 or cond2 else "PASS" for cond1, cond2 in zip(condition5, condition6)]
+                        boolList2_percent = ["FAIL" if cond1 or cond2 else "PASS" for cond1, cond2 in zip(condition7, condition8)]
+
                         condition_series = pd.Series(boolList)
                         condition_series2 = pd.Series(boolList2)
+
+                        condition_series_percent = pd.Series(boolList_percent)
+                        condition_series2_percent = pd.Series(boolList2_percent)
 
                         # Scatter plot setup based on pass/fail condition
                         color_condition = np.where(condition_series == "PASS", "black", "red")
@@ -839,6 +894,10 @@ class datatoGraph2(datatoCSV_Accuracy2):
                         # Plot for Programming Voltage Error
                         ax1.scatter(Iset, ProgrammingI_error, color=color_condition, s=size_condition, alpha=alpha_condition)
                         ax1.plot(Iset, ProgrammingI_error, label=f"Voltage = {Vset.iloc[0]}", linewidth=0.8)
+
+                        # Plot for Percentage Error Boundaries
+                        ax3.scatter(Vset, ProgrammingI_percent_error, color=color_condition, s=size_condition, alpha=alpha_condition)
+                        ax3.plot(Vset, ProgrammingI_percent_error, label=f"Current = {Iset.iloc[0]}", linewidth=0.8)
 
                         # Labeling data points
                         """"for i, txt in enumerate(ProgrammingV_error):
@@ -851,6 +910,10 @@ class datatoGraph2(datatoCSV_Accuracy2):
 
                         ax2.scatter(Iset, Ireadback_error, color=color_condition2, s=size_condition2, alpha=alpha_condition2)
                         ax2.plot(Iset, Ireadback_error, label=f"Voltage = {Vset.iloc[0]}", linewidth=0.8)
+                        
+                         # Plot for Readback Percentage Error Boundaries
+                        ax4.scatter(Vset, ReadbackI_percent_error, color=color_condition2, s=size_condition2, alpha=alpha_condition2)
+                        ax4.plot(Vset, ReadbackI_percent_error, label=f"Current = {Iset.iloc[0]}", linewidth=0.8)
 
                         # Labeling data points
                         """for i, txt in enumerate(Vreadback_error):
@@ -864,26 +927,49 @@ class datatoGraph2(datatoCSV_Accuracy2):
                         upper_error_limitC2 = pd.concat([upper_error_limitC2, upper_error_limit2])
                         lower_error_limitC2 = pd.concat([lower_error_limitC2, lower_error_limit2])
                         conditionC2 = pd.concat([conditionC2, condition_series2])
+
+                        # Collect percentage results for CSV output
+                        upper_erro_percent_limitC = pd.concat([upper_erro_percent_limitC, upper_erro_percent_limit])
+                        lower_erro_percent_limitC = pd.concat([lower_erro_percent_limitC, lower_erro_percent_limit])
+                        condition_percentC = pd.concat([condition_percentC, condition_series_percent])  
+
+                        upper_erro_percent_limitC2 = pd.concat([upper_erro_percent_limitC2, upper_erro_percent_limit2])
+                        lower_erro_percent_limitC2 = pd.concat([lower_erro_percent_limitC2, lower_erro_percent_limit2])
+                        condition2_percentC = pd.concat([condition2_percentC, condition_series2_percent])
                     
                     ax1.axhline(y=0, color="grey", linestyle="--", linewidth=0.8)
                     ax2.axhline(y=0, color="grey", linestyle="--", linewidth=0.8)
+                    ax3.axhline(y=0, color="grey", linestyle="--", linewidth=0.8)
+                    ax4.axhline(y=0, color="grey", linestyle="--", linewidth=0.8)
 
                     # Plot error boundaries and save plot
                     ax1.plot(all_Iset, all_upper_error_limit, label="Upper Bound", color="red", linewidth=1)
                     ax1.plot(all_Iset, all_lower_error_limit, label="Lower Bound", color="red", linewidth=1)
                     ax1.legend(loc="lower left", fontsize=6)
-
                     ax1.set_title(unit)
                     ax1.set_xlabel("Current (A)")
-                    ax1.set_ylabel("Programming/Current Absolute Error (mA)")
+                    ax1.set_ylabel("Programming/Current Absolute Error (A)")
 
                     ax2.plot(all_Iset, all_upper_error_limit2, label="Upper Bound", color="red", linewidth=1)
                     ax2.plot(all_Iset, all_lower_error_limit2, label="Lower Bound", color="red", linewidth=1)
                     ax2.legend(loc="lower left", fontsize=6)
-
                     ax2.set_title(unit)
                     ax2.set_xlabel("Current (A)")
-                    ax2.set_ylabel("PSU Readback Current Error (mA)")
+                    ax2.set_ylabel("PSU Readback Current Error (A)")
+
+                    ax3.plot(all_Iset, all_upper_percent_error_limit, label="Upper Bound", color="red", linewidth=1)
+                    ax3.plot(all_Iset, all_lower_percent_error_limit, label="Lower Bound", color="red", linewidth=1)
+                    ax3.legend(loc="lower left", fontsize=6)
+                    ax3.set_title(f"{unit} Percentage Error")
+                    ax3.set_xlabel("Voltage (V)" if unit.upper() == "VOLTAGE" else "Current (A)")
+                    ax3.set_ylabel("Relative/Current Percentage Error (%)")
+
+                    ax4.plot(all_Iset, all_upper_percent_error_limit, label="Upper Bound", color="red", linewidth=1)
+                    ax4.plot(all_Iset, all_lower_percent_error_limit, label="Lower Bound", color="red", linewidth=1)
+                    ax4.legend(loc="lower left", fontsize=6)
+                    ax4.set_title(f"{unit} Readback Percentage Error")
+                    ax4.set_xlabel("Voltage (V)" if unit.upper() == "VOLTAGE" else "Current (A)")
+                    ax4.set_ylabel("PSU Readback Current Percentage Error (%)")
 
                     # Save the error boundaries and conditions to CSV
                     conditionFF = conditionC.reset_index(drop=True).to_frame(name="Programming Condition")
@@ -894,16 +980,30 @@ class datatoGraph2(datatoCSV_Accuracy2):
                     upper_error_limitF2 = upper_error_limitC2.reset_index(drop=True).to_frame(name="Readback Upper Error Boundary (A)")
                     lower_error_limitF2 = lower_error_limitC2.reset_index(drop=True).to_frame(name="Readback Lower Error Boundary (A)")
 
+                    conditionFF_percent = condition_percentC.reset_index(drop=True).to_frame(name="Programming Percentage Condition")
+                    upper_error_limitF_percent = upper_erro_percent_limitC.reset_index(drop=True).to_frame(name="Programming Upper Percentage Error Boundary (%)")
+                    lower_error_limitF_percent = lower_erro_percent_limitC.reset_index(drop=True).to_frame(name="Programming Lower Percentage Error Boundary (%)")
+
+                    conditionFF2_percent = condition2_percentC.reset_index(drop=True).to_frame(name="Readback Percentage Condition")
+                    upper_error_limitF2_percent = upper_erro_percent_limitC2.reset_index(drop=True).to_frame(name="Readback Upper Percentage Error Boundary (%)")
+                    lower_error_limitF2_percent = lower_erro_percent_limitC2.reset_index(drop=True).to_frame(name="Readback Lower Percentage Error Boundary (%)")
+                    
                     # Drop the 'key' column from ungrouped_df
                     ungrouped_df.drop(columns=["key"], inplace=True)
+                    # After the loop
+                    ungrouped_df["Relative/Current Percentage Error (%)"] = pd.concat(self.ProgrammingI_percent_error_list).reset_index(drop=True)
+                    ungrouped_df["PSU Readback Current Percentage Error (%)"] = pd.concat(self.ReadbackI_percent_error_list).reset_index(drop=True)
 
                     # Combine all DataFrames into a single DataFrame
-                    combined_df = pd.concat([ungrouped_df, upper_error_limitF, lower_error_limitF, conditionFF, upper_error_limitF2, lower_error_limitF2, conditionFF2], axis=1)
+                    combined_df = pd.concat([ungrouped_df, upper_error_limitF, lower_error_limitF, conditionFF, upper_error_limitF2, lower_error_limitF2, conditionFF2, upper_error_limitF_percent, lower_error_limitF_percent, conditionFF_percent, upper_error_limitF2_percent, lower_error_limitF2_percent, conditionFF2_percent], axis=1)
 
                     # Save the combined DataFrame to a CSV file
                     combined_df.to_csv(ERROR_CSV_PATH, index=False)
 
-                    plt.savefig(IMAGE_PATH)
+                    fig.savefig(IMAGE_PATH)
+                    plt.close(fig)
+                    fig_percent.savefig(IMAGE_PATH_2)
+                    plt.close(fig_percent)
 
 class datatoGraph3(datatoCSV_PowerAccuracy):
                 """Child class of datatoCSV_Accuracy to plot error boundaries for Voltage/Current accuracy testing"""

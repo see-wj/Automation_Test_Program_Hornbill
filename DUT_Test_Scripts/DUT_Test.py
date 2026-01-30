@@ -148,8 +148,9 @@ class NewVoltageMeasurement:
         self.infoList = []
         self.dataList = []
         self.dataList2 = []
+        self.running = True #Shamman changes
 
-    def Execute_Voltage_Accuracy(self,dict,channel, worker=None):
+    def Execute_Voltage_Accuracy(self, dict, channel, worker=None):
         (
             Read,
             Apply,
@@ -230,7 +231,6 @@ class NewVoltageMeasurement:
 
         if dict["Range"] == "Auto":
             Sense(dict["DMM"]).setVoltageRangeDCAuto()
-
         else:
             Sense(dict["DMM"]).setVoltageRangeDC(dict["Range"])
 
@@ -251,6 +251,10 @@ class NewVoltageMeasurement:
         I_fixed = float(dict["minCurrent"])         #Min Current
         V = float(dict["minVoltage"])
         I = float(dict["maxVoltage"]) + 1
+
+        temp_values = 0
+        temp_values2 = 0
+
         current_iter = (
             (float(dict["maxCurrent"]) - float(dict["minCurrent"]))
             / float(dict["current_step_size"])
@@ -286,7 +290,7 @@ class NewVoltageMeasurement:
             Iset = float(Current(dict["PSU"]).SourceCurrentLevel()) #Query Current Level
 
             if I_fixed > float(dict["maxCurrent"]):
-                I_fixed= float(dict["maxCurrent"])
+                I_fixed = float(dict["maxCurrent"])
 
             #If minimum current is 0, set to 1A
             if I_fixed == 0:           
@@ -323,7 +327,7 @@ class NewVoltageMeasurement:
                 #Readback Voltage and Current
                 temp_values = float(Measure(dict["PSU"]).multipleChannelQuery(ch,"VOLT"))
                 WAI(dict["PSU"])
-                temp_values2 = Measure(dict["PSU"]).multipleChannelQuery(ch,"CURR")
+                temp_values2 = float(Measure(dict["PSU"]).multipleChannelQuery(ch,"CURR"))
                 WAI(dict["PSU"])
                 sleep(1)
                 self.dataList2.insert(k, [float(temp_values), float(temp_values2)])
@@ -364,9 +368,17 @@ class NewVoltageMeasurement:
                         break
 
                 if worker is not None:
-                    worker.new_data.emit(voltagemeasured - V, temp_values - voltagemeasured)
-   
-                      
+                    prog_percent = (voltagemeasured - V)/V*100
+                    read_percent = (temp_values - voltagemeasured)/voltagemeasured*100
+                    prog_upper_bound = (V*self.param1) + self.param2
+                    prog_lower_bound = -prog_upper_bound
+                    read_upper_bound = (V*self.param3) + self.param4
+                    read_lower_bound = -read_upper_bound
+                    perc_up_bound = 100
+                    perc_low_bound = -100
+                    worker.new_data.emit(V, I_fixed, temp_values, voltagemeasured, temp_values2, voltagemeasured - V, temp_values - voltagemeasured, prog_percent, read_percent, prog_upper_bound, prog_lower_bound, read_upper_bound, read_lower_bound, perc_up_bound, perc_low_bound)
+                    worker.popup_data.emit(voltagemeasured - V, temp_values - voltagemeasured, prog_upper_bound, prog_lower_bound, read_upper_bound, read_lower_bound, prog_percent, read_percent, perc_up_bound, perc_low_bound)
+
                 WAI(dict["DMM"])
 
                 #Increment of Steps
@@ -406,7 +418,7 @@ class NewCurrentMeasurement:
         self.dataList = []
         self.dataList2 = []
 
-    def executeCurrentMeasurementA(self, dict, channel):
+    def executeCurrentMeasurementA(self, dict, channel, worker=None):
         """Execution of Current Measurement for Programm / Readback Accuracy using Status Event Registry to synchronize Instrument
 
         The function first declares two lists, datalist & infolist that will be used to collect data.
@@ -516,6 +528,11 @@ class NewCurrentMeasurement:
         Function(dict["ELoad"]).setMode("Voltage")
         Function(dict["PSU"]).setMode("Current")
 
+        #Instrument Channel Set         #Shamman changes
+        Voltage(dict["PSU"]).setInstrumentChannel(ch)
+        Voltage(dict["ELoad"]).setInstrumentChannel(dict["ELoad_Channel"])
+        sleep(2)
+
         #Set Series/Parallel Mode
         if dict["OperationMode"] == "Series":
             Output(dict["PSU"]).SPModeConnection("SER")
@@ -555,8 +572,11 @@ class NewCurrentMeasurement:
         j = 0
         k = 0
         V_fixed = float(dict["minVoltage"])
-        # V = float(dict["maxVoltage"]) + 1
+        #V = float(dict["maxCurrent"]) + 1
         I = float(dict["minCurrent"])
+
+        temp_values = 0 #V_programming
+        temp_values2 = 0 #I_readback
 
         if self.rshunt == 0.01: #(100A) (1V + cable loss)
             VshuntdropMax = 2
@@ -573,6 +593,7 @@ class NewCurrentMeasurement:
             (float(dict["maxVoltage"]) - float(dict["minVoltage"]))
             / float(dict["voltage_step_size"])
         ) + 1
+        sleep(1)
 
         Voltage(dict["PSU"]).setOutputVoltage("MAXimum") #Set Vmax at PSU
         WAI(dict["PSU"])
@@ -581,30 +602,41 @@ class NewCurrentMeasurement:
 
         Output(dict["PSU"]).setOutputState("ON")
         WAI(dict["PSU"])
-        sleep(3)
+        Output(dict["ELoad"]).setOutputState("ON")
+        WAI(dict["ELoad"])
 
+        #Clear the Error Status
+        CLS(dict["PSU"])
+        WAI(dict["PSU"])
+        CLS(dict["ELoad"])
+        WAI(dict["ELoad"])
+        CLS(dict["DMM"])
+        WAI(dict["DMM"])
+        
         while i < voltage_iter:
 
             j = 0
             I = float(dict["minCurrent"])
-
-            if V_fixed> float(dict["maxVoltage"]):
+            Vset = float(Voltage(dict["PSU"]).SourceVoltageLevel())  #Shamman changes
+            
+            if V_fixed > float(dict["maxVoltage"]):
                 V_fixed = float(dict["maxVoltage"])
 
             # Setting to prevent draw to much voltage
             if V_fixed == 0:
                 Voltage(dict["ELoad"]).setOutputVoltage(1)
                 WAI(dict["ELoad"])
-            elif V_fixed == float(dict["maxVoltage"]):
+
+            elif V_fixed == float(dict["maxVoltage"]) and Vset == float(dict["maxVoltage"]):   #Shamman changes
                 Voltage(dict["ELoad"]).setOutputVoltage(V_fixed-VshuntdropMax)
                 WAI(dict["ELoad"])
             else:
                 Voltage(dict["ELoad"]).setOutputVoltage(V_fixed)
                 WAI(dict["ELoad"])
 
-            Output(dict["ELoad"]).setOutputState("ON")
-            WAI(dict["ELoad"])
-            sleep(3)
+            '''Output(dict["ELoad"]).setOutputState("ON")
+            WAI(dict["ELoad"])'''
+            sleep(1)
 
             while j < current_iter:
 
@@ -618,19 +650,20 @@ class NewCurrentMeasurement:
                 self.infoList.insert(k, [V_fixed, I, i])
                 #offset
                 sleep(0.2)
-                sleep(self.updatedelay)
+                sleep(float(self.updatedelay))
 
                 #PSU ReadBack
-                temp_values = Measure(dict["PSU"]).singleChannelQuery("VOLT")
+                temp_values = float(Measure(dict["PSU"]).multipleChannelQuery(ch,"VOLT"))
                 WAI(dict["PSU"])
-                temp_values2 = Measure(dict["PSU"]).singleChannelQuery("CURR")
+                temp_values2 = float(Measure(dict["PSU"]).multipleChannelQuery(ch,"CURR"))
                 WAI(dict["PSU"])
-
+                sleep(1)
                 self.dataList2.insert(k, [float(temp_values), float(temp_values2)])
                 
                 #DMM Condition & Measurements
                 Initiate(dict["DMM2"]).initiate()
                 status = float(Status(dict["DMM2"]).operationCondition())
+                sleep(1)
                 TRG(dict["DMM2"])
 
                 while 1:
@@ -653,6 +686,9 @@ class NewCurrentMeasurement:
                             k, [0 , currentmeasured]
                         )
                         break
+
+                if worker is not None:
+                    worker.new_data.emit(V_fixed, I, temp_values, currentmeasured, temp_values2, currentmeasured - I, temp_values - currentmeasured)
                 
                 WAI(dict["DMM2"])
 
@@ -671,7 +707,7 @@ class NewCurrentMeasurement:
                 #    powermeasure = float ((float(temp_values) + float(dict["voltage_step_size"]) ) * I)
 
                 #Limit V/I if power test exceeded
-                powermeasure = V_fixed * I       
+                powermeasure = float(V_fixed * I)       
 
                 if powermeasure > self.Power:
                     break
