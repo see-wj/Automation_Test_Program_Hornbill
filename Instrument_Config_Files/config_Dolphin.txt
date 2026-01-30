@@ -11,11 +11,11 @@ noofloop = 1
 updatedelay = 3.0
 
 //Connections (Visa Address Default Settings)
-PSU = USB0::0x2A8D::0xCC04::CN10000012::0::INSTR
-DMM = USB0::0x2A8D::0x0201::MY57701012::0::INSTR
+PSU = USB0::0x2A8D::0xCC04::CN10000023::0::INSTR
+DMM = USB0::0x2A8D::0x0201::MY57702180::0::INSTR
 ELoad = USB0::0x2A8D::0x3702::MY60260104::0::INSTR
-OSC = USB0::0x0957::0x1754::MY44008005::0::INSTR
-DMM2 = USB0::0x2A8D::0x1301::MY53204794::0::INSTR
+OSC = USB0::0x0957::0x1754::MY44004673::0::INSTR
+DMM2 = USB0::0x2A8D::0x1301::MY57702177::0::INSTR
 ACSource = USB0::0x2A8D::0x3801::LPQ0000103::0::INSTR
 DMM_Instrument = Keysight
 
@@ -75,20 +75,38 @@ UpTime = 50
 DownTime = 50
 
 //Oscilloscope Settings
-OSC_Channel = 1
-V_Settling_Band = 16
-T_Settling_Band = 0.0002
-//===============================X1,X10,X20,X100
-Probe_Setting = X10
-//===============================NORMal,PEAK,AVERage,HRESolution	
-Acq_Type = NORMal	
-Channel_CouplingMode = DC	
-Trigger_CouplingMode = DC
-//===============================EDGE,IIC,EBUR
-Trigger_Mode = EDGE	
-//===============================NORMAL,AUTO	
-Trigger_SweepMode = NORMAL	
-//===============================ALT,POS,NEG,EITH
-Trigger_SlopeMode = EITH
-TimeScale = 0.02
-VerticalScale = 5
+DUT_OSC_Channel = CHANNEL1
+CurrentTrigger_OSC_Channel = CHANNEL2
+TriggerSource = CHANNEL2
+DUT_Channel_Unit = VOLT
+DUT_Channel_Offset = 0
+DUT_Channel_CouplingMode = AC
+DUT_Trigger_CouplingMode = DC
+DUT_Trigger_Mode = EDGE
+DUT_Trigger_SweepMode = NORMAL
+DUT_Trigger_SlopeMode = EITHer
+DUT_TimeScale = 0.0002
+DUT_VerticalScale = 0.5
+DUT_V_Settling_Band = 0.5
+DUT_T_Settling_Band = 0.0005
+DUT_Probe_Setting = X10
+DUT_Acq_Type = AVERage
+DUT_Unit = VOLT
+CurrentTrigger_Channel_Unit = AMPere
+CurrentTrigger_Channel_Offset = -2
+CurrentTrigger_Channel_CouplingMode = DC
+CurrentTrigger_Trigger_CouplingMode = DC
+CurrentTrigger_Trigger_Mode = EDGE
+CurrentTrigger_Trigger_SweepMode = NORMAL
+CurrentTrigger_Trigger_SlopeMode = EITHer
+CurrentTrigger_TimeScale = 0.01
+CurrentTrigger_VerticalScale = 2
+CurrentTrigger_V_Settling_Band = 1
+CurrentTrigger_T_Settling_Band = 0.001
+CurrentTrigger_Probe_Setting = X100
+CurrentTrigger_Acq_Type = AVERage
+CurrentTrigger_Unit = AMPere
+
+
+//Auxiliary Equipments
+relay_voltage = RELAY

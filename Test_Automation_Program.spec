@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['C:\\Automation_Test_Program_Hornbill\\src\\GUI.py'],
+    ['C:\\Automation_Test_Program_Hornbill-1\\src\\GUI.py'],
     pathex=[],
     binaries=[],
-    datas=[('C:\\Automation_Test_Program_Hornbill\\csv', 'csv'), ('C:\\Automation_Test_Program_Hornbill\\Instrument_Config_Files', 'Instrument_Config_Files'), ('C:\\Automation_Test_Program_Hornbill\\setup_images', 'setup_images'), ('C:\\Automation_Test_Program_Hornbill\\SCPI_Library', 'SCPI_Library')],
+    datas=[('C:\\Automation_Test_Program_Hornbill-1\\csv', 'csv'), ('C:\\Automation_Test_Program_Hornbill-1\\Instrument_Config_Files', 'Instrument_Config_Files'), ('C:\\Automation_Test_Program_Hornbill-1\\setup_images', 'setup_images'), ('C:\\Automation_Test_Program_Hornbill-1\\SCPI_Library', 'SCPI_Library'), ('C:\\Automation_Test_Program_Hornbill-1\\External_Auxiliary_Equipment', 'External_Auxiliary_Equipment')],
     hiddenimports=['numpy.core._dtype_ctypes', 'numpy._globals'],
     hookspath=[],
     hooksconfig={},
@@ -35,5 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['C:\\Automation_Test_Program_Hornbill\\TestingTools.ico'],
+    icon=['C:\\Automation_Test_Program_Hornbill-1\\TestingTools.ico'],
 )

@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "c:\Automation_Test_Program_Hornbill-1\src\GUI.py", line 10041, in run
+    A = xlreport(save_directory=self.params.savedir, file_name=str(self.params.unit))
+                                ^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Parameters' object has no attribute 'savedir'

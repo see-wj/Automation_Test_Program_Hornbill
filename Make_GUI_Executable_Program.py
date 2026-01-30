@@ -16,6 +16,7 @@ extra_folders = [
     'Instrument_Config_Files',
     'setup_images',
     'SCPI_Library',
+    'External_Auxiliary_Equipment',
 ]
 
 # --- Validation checks ---

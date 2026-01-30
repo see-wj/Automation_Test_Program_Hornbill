@@ -1,0 +1,94 @@
+#Configuration Setting for Dolphin (E36441A) (Testing)
+
+//Default Settings (For initialization)
+savelocation = C:/PyVisa - Copy  - Excavator - Copy/PyVisa/Test Data/File Export Testing
+currloop = 1
+voltloop = 1
+readbackvoltage = 0
+readbackcurrent = 0
+estimatetime = 0
+noofloop = 1
+updatedelay = 1.0
+
+//Connections (Visa Address Default Settings)
+PSU = USB0::0x2A8D::0xCC04::CN10000012::0::INSTR
+DMM = USB0::0x2A8D::0x0201::MY57701012::0::INSTR
+ELoad = USB0::0x2A8D::0x3702::MY60260104::0::INSTR
+OSC = USB0::0x0957::0x1754::MY44008005::0::INSTR
+DMM2 = USB0::0x2A8D::0x1301::MY53204794::0::INSTR
+ACSource = USB0::0x2A8D::0x3801::LPQ0000103::0::INSTR
+DMM_Instrument = Keysight
+
+//General Settings
+PSU_Channel = 1
+ELoad_Channel = 1
+setFunction = Voltage
+VoltageRes = SLOW
+VoltageSense = EXT
+rshunt = 0.01
+
+//Error Settings
+Programming_Error_Gain = 0.0005
+Programming_Error_Offset = 0.005
+Readback_Error_Gain = 0.0005
+Readback_Error_Offset = 0.005
+Load_Programming_Error_Gain =  0.0001
+Load_Programming_Error_Offset =  0.002
+
+Programming_Response_Up_NoLoad = 80
+Programming_Response_Up_FullLoad = 80
+Programming_Response_Down_NoLoad = 500
+Programming_Response_Down_FullLoad = 500
+
+OVP_ErrorGain = 0.002
+OVP_ErrorOffset = 0.4
+
+//Power 
+Power_Rating = 30
+Power = 30
+powerini = 0
+power_step_size = 10
+
+Power_Programming_Error_Offset = 0.0005
+Power_Programming_Error_Gain = 0.005
+Power_Readback_Error_Offset = 0.0005
+Power_Readback_Error_Gain = 0.005
+
+//Voltage & Current Settings
+Voltage_Rating = 30
+Current_Rating = 5
+minCurrent = 1
+maxCurrent = 1
+current_step_size = 1
+minVoltage = 1
+maxVoltage = 10
+voltage_step_size = 1
+
+
+//DMM Settings (Default Hardcoded in GUI.py)
+Range = Auto
+Aperture = 10
+AutoZero = ON
+//Auto - ON, 10M - OFF
+inputZ = ON
+UpTime = 50
+DownTime = 50
+
+//Oscilloscope Settings
+OSC_Channel = 1
+V_Settling_Band = 16
+T_Settling_Band = 0.0002
+//===============================X1,X10,X20,X100
+Probe_Setting = X10
+//===============================NORMal,PEAK,AVERage,HRESolution	
+Acq_Type = NORMal	
+Channel_CouplingMode = DC	
+Trigger_CouplingMode = DC
+//===============================EDGE,IIC,EBUR
+Trigger_Mode = EDGE	
+//===============================NORMAL,AUTO	
+Trigger_SweepMode = NORMAL	
+//===============================ALT,POS,NEG,EITH
+Trigger_SlopeMode = EITH
+TimeScale = 0.02
+VerticalScale = 5

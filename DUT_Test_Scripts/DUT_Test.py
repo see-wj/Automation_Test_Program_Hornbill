@@ -99,45 +99,36 @@ class Dimport:
 
 #Check Visa IO address
 class VisaResourceManager:
-    """Manage the VISA Resources
-
-    Attributes:
-        args: args should contain one or multiple string containing the Visa Address of an dict["Instrument"]
-
-    """
+    """Manage the VISA Resources"""
 
     def __init__(self):
-        """Initiate the object rm as Resource Manager"""
-        rm = pyvisa.ResourceManager()
-        self.rm = rm
+        self.rm = pyvisa.ResourceManager()
+        self.instruments = []  # store all opened instruments
 
     def openRM(self, *args):
-        """Open the VISA Resources to be used
-
-        The program also initiates and standardize certain specifications such as the baud rate.
-
-            Args:
-                *args: to declare single or multiple VISA Resources
-
-            Returns:
-                Return a Boolean to the program whether there were any errors encountered.
-
-            Raises:
-                VisaIOError: An error occured when opening PyVisa Resources
-
-        """
+        """Open VISA Resources"""
         try:
-            for i in range(len(args)):
-                instr = self.rm.open_resource(args[i])
-                instr.baud_rate = 9600
+            self.instruments.clear()
+            for addr in args:
+                instr = self.rm.open_resource(addr)
+                try:
+                    instr.baud_rate = 9600  # only for serial devices
+                except AttributeError:
+                    pass
+                self.instruments.append(instr)
 
-            return 1, None
+            return 1, self.instruments
         except pyvisa.VisaIOError as e:
             print(e.args)
             return 0, e.args
 
     def closeRM(self):
-        """Closes the Visa Resources when not in used"""
+        """Closes all VISA Resources"""
+        for instr in getattr(self, "instruments", []):
+            try:
+                instr.close()
+            except Exception:
+                pass
         self.rm.close()
 
 ######################################################################
