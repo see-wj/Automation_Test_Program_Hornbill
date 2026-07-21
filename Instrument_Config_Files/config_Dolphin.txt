@@ -12,8 +12,8 @@ updatedelay = 3.0
 
 //Connections (Visa Address Default Settings)
 PSU = USB0::0x2A8D::0xCC04::CN10000023::0::INSTR
-DMM = USB0::0x2A8D::0x0201::MY57702180::0::INSTR
-ELoad = USB0::0x2A8D::0x3702::MY60260104::0::INSTR
+DMM = USB0::0x2A8D::0x0501::MY57702180::0::INSTR
+ELoad = USB0::0x2A8D::0x5C02::MY62100043::0::INSTR
 OSC = USB0::0x0957::0x1754::MY44004673::0::INSTR
 DMM2 = USB0::0x2A8D::0x1301::MY57702177::0::INSTR
 ACSource = USB0::0x2A8D::0x3801::LPQ0000103::0::INSTR
@@ -51,8 +51,8 @@ OVP_ErrorGain = 0.002
 OVP_ErrorOffset = 0.4
 
 //Power 
-Power_Rating = 160
-Power = 160
+Power_Rating = 50
+Power = 50
 powerini = 0
 power_step_size = 10
 
@@ -62,7 +62,7 @@ Power_Readback_Error_Offset = 0.0005
 Power_Readback_Error_Gain = 0.005
 
 //Voltage & Current Settings
-Voltage_Rating = 32
+Voltage_Rating = 30
 Current_Rating = 10
 minCurrent = 1
 maxCurrent = 3

@@ -10,10 +10,10 @@ for import_path in (SRC, ROOT):
     if str(import_path) not in sys.path:
         sys.path.insert(0, str(import_path))
 
-import xlreport as xlreport_module
-import xlreportpower as xlreportpower_module
-from run_context import REALTIME_COLUMNS, RunContext
-from test_configuration import ParameterSnapshot
+from reporting import xlreport as xlreport_module
+from reporting import xlreportpower as xlreportpower_module
+from execution.run_context import REALTIME_COLUMNS, RunContext
+from configuration.test_configuration import ParameterSnapshot
 
 
 class RunContextTests(unittest.TestCase):
@@ -45,8 +45,8 @@ class RunContextTests(unittest.TestCase):
             first_path = first.open_realtime_csv("first")
             second_path = second.open_realtime_csv("second")
 
-            first.write_realtime_row(range(13))
-            second.write_realtime_row(range(100, 113))
+            first.write_realtime_row(range(15))
+            second.write_realtime_row(range(100, 115))
             first.close()
             second.close()
 
@@ -56,8 +56,19 @@ class RunContextTests(unittest.TestCase):
                 second_rows = list(csv.reader(csv_file))
 
         self.assertEqual(tuple(first_rows[0]), REALTIME_COLUMNS)
+        self.assertEqual(len(first_rows[0]), len(first_rows[1]))
         self.assertEqual(first_rows[1][1], "0")
         self.assertEqual(second_rows[1][1], "100")
+
+    def test_realtime_csv_rejects_rows_with_wrong_width(self):
+        with tempfile.TemporaryDirectory() as directory:
+            context = self._create_context(directory, "first", "Dolphin")
+            context.open_realtime_csv("first")
+            try:
+                with self.assertRaisesRegex(ValueError, "requires 15 values"):
+                    context.write_realtime_row(range(13))
+            finally:
+                context.close()
 
     def test_report_infers_paths_from_its_own_run(self):
         with tempfile.TemporaryDirectory() as directory:

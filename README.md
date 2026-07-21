@@ -96,33 +96,59 @@ During a test run, SCPI wrappers reuse one VISA session per instrument address.
 Sessions are isolated to the worker thread, closed before final hardware shutdown,
 and remain independent from GUI discovery and preflight connections.
 Production test execution and cooperative pause, resume, and abort behavior live in
-`src/test_worker.py`; `src/GUI.py` owns presentation and signal wiring.
-Each execution receives a `RunContext` from `src/run_context.py`. It owns the run
+`src/execution/test_worker.py`; `src/GUI.py` owns presentation and signal wiring.
+`src/GUI.py` remains the application entry point and legacy-dialog host, while the
+production `AllTestMeasurement` dialog and its direct UI helpers live in
+`src/ui/all_test_dialog.py`.
+Mutable GUI parameter state and setup-file loading live in
+`src/configuration/test_parameters.py`, keeping dialog construction separate from configuration data.
+Each execution receives a `RunContext` from `src/execution/run_context.py`. It owns the run
 tree, parameter snapshot, realtime CSV, chart paths, and diagnostics destinations;
 queued runs therefore do not share output files. Report generators infer their own
 `raw/` and `charts/` directories from the requested `reports/` directory.
-`src/test_run_controller.py` owns worker lifecycle and provides a FIFO queue for
-sequential runs. Test-selection widgets/state and worker parameter construction are
-isolated in `src/test_selection.py` and `src/test_configuration.py`. DUT setup files
-are loaded through `src/configuration_service.py`.
+`src/execution/test_run_controller.py` owns worker lifecycle and provides a FIFO queue for
+sequential runs. `src/queueing/queue_coordinator.py` connects that controller to queue UI,
+persistence, interrupted-run recovery, and reusable templates. Test-selection
+widgets/state and worker parameter construction are
+isolated in `src/configuration/test_selection.py` and
+`src/configuration/test_configuration.py`. DUT setup files are loaded through
+`src/configuration/configuration_service.py`.
 Queue-template serialization and reconstruction are isolated in
-`src/queue_template_service.py`; encoding-safe console and run-log writes live in
-`src/output_logging.py`.
+`src/queueing/queue_template_service.py`; encoding-safe console and run-log writes
+live in `src/common/output_logging.py`.
+VISA enumeration, identity queries, IP/hostname classification, model-role mapping,
+and discovery-resource cleanup live in `src/instruments/instrument_discovery.py`.
+Production widget population and automatic role selection live in
+`src/ui/instrument_discovery_ui.py`.
+Production dialog signal declarations live in `src/ui/all_test_signal_bindings.py`,
+and the legacy launcher uses `src/ui/dialog_registry.py` instead of an index-based
+dialog chain. Shared DUT SCPI class loading and VISA preflight plumbing live in
+`DUT_Test_Scripts/scpi_runtime.py`.
 
 Use **Add to Queue** to snapshot the current setup without starting it. Pending rows
 can be reordered or removed, and **Run Queue** executes them sequentially. Every row
-receives its own run directory and reports `Pending`, `Running`, `Completed`,
-`Failed`, or `Aborted`. Aborting an active row leaves the remaining queue available;
+receives its own run directory and reports `Pending`, `Running`, `Paused`,
+`Stopping`, `Completed`, `Failed`, `Aborted`, `Interrupted`, or `Retried`. Aborting
+an active row leaves the remaining queue available;
 **Clear Pending** removes waiting rows.
 **Duplicate** creates an independent copy of any selected row. **Retry Failed**
-requeues failed or aborted rows using their original parameter snapshot. **Save
-Template** stores pending rows in portable JSON, and **Load Template** appends new
+requeues failed, aborted, or interrupted rows using their original parameter
+snapshot. **Save Template** stores pending rows in portable JSON, and **Load
+Template** appends new
 queue entries without reusing old run IDs.
 Completed, failed, aborted, and removed history is limited to the newest 200 rows
 per dialog session so long-running stations do not accumulate unbounded objects.
-Pending items are saved atomically to
+Pending and active items are saved atomically to
 `Instrument_Config_Files/test_queue.json` and restored when the test dialog opens
-again. Active, completed, failed, and aborted rows are not restored.
+again. A run that was active when the application exited is restored as
+`Interrupted` with its previous artifact-directory path. It never starts
+automatically; review its output and retry or remove it manually. Completed, failed,
+and aborted rows are not restored.
+
+Each run also writes `logs/execution_checkpoint.json` after a complete loop. Retrying
+an interrupted run continues from the next fully completed loop and links the new
+run to the previous artifact directory. A partially completed loop is intentionally
+restarted because resuming from an unknown SCPI command would be unsafe.
 
 The old multithread voltage prototype is retained under `src/experiments/` and is
 loaded only when its legacy dialog is explicitly opened.

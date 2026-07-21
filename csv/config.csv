@@ -1,10 +1,10 @@
 Parameter,Value
 DUT,Dolphin
 savedir,C:/Users/weijsee6/Downloads
-V_Rating,32
+V_Rating,30
 I_Rating,10
-P_Rating,160
-power,160
+P_Rating,50
+power,50
 estimatetime,0
 updatedelay,3.0
 readbackvoltage,0

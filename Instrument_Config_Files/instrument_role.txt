@@ -6,6 +6,7 @@ Hornbill: PSU
 //Electronics Load Instrument 
 EL33133A: ELOAD
 EL34243A: ELOAD
+MY62100043: ELOAD
 E36731A: ELOAD
 
 
@@ -21,3 +22,6 @@ MSO-X4104A: SCOPE
 
 //AC Source
 6813C: ACSource
+
+//Data Acquisition
+DAQ973A: DAQ

@@ -10,7 +10,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from output_logging import append_timestamped_line, print_console_safe
+from common.output_logging import append_timestamped_line, print_console_safe
 
 
 class OutputLoggingTests(unittest.TestCase):

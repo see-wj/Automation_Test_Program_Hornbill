@@ -6,11 +6,37 @@
 Calibration development remains gated until the baseline hardware checks below
 pass with the intended DUT and instrument setup.
 
+Record the release candidate, instrument inventory, safety outcomes, and DUT matrix
+in `HARDWARE_VALIDATION_RESULTS.md` while performing this checklist.
+
 Use this checklist after worker, VISA, shutdown, or measurement changes. Automated
 tests use mocked instruments and do not replace this validation.
 
 Runs created with `python src/GUI.py --simulate` are software checks only and do
 not satisfy any item in the hardware test matrix.
+
+## Fault-Injection Checks
+
+The simulation backend supports deterministic one-shot failures for automated
+recovery testing:
+
+```python
+from SCPI_Library.simulation import clear_simulation_faults, inject_simulation_fault
+
+inject_simulation_fault(
+    "query",
+    "timeout",
+    resource_name="USB0::SIM::DMM::INSTR",
+)
+clear_simulation_faults()
+```
+
+Supported operations are `connect`, `write`, `query`, `read`, `report`, `close`,
+and `close_manager`. Supported failures are `timeout`, `disconnect`, `report`, and
+`cleanup`. Optional `command_pattern`, `after`, and `repeat` arguments narrow when
+the fault occurs. Run `python -m unittest tests.test_simulation
+tests.test_simulation_workflows tests.test_end_to_end_queue` to verify timeout,
+disconnect, report, cleanup, queue halt, and queue resume behavior without hardware.
 
 ## Safety Preconditions
 

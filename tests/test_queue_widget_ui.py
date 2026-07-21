@@ -10,8 +10,8 @@ for import_path in (SRC, ROOT):
 
 from PyQt5.QtWidgets import QApplication
 
-from test_queue_widget import TestQueueWidget
-from test_run_controller import TestRunRequest
+from ui.test_queue_widget import TestQueueWidget
+from execution.test_run_controller import TestRunRequest
 
 
 class TestQueueWidgetTests(unittest.TestCase):

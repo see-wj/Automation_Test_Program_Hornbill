@@ -9,8 +9,8 @@ for import_path in (SRC, ROOT):
     if str(import_path) not in sys.path:
         sys.path.insert(0, str(import_path))
 
-from queue_template_service import append_queue_template, save_queue_template
-from test_run_controller import TestRunController
+from queueing.queue_template_service import append_queue_template, save_queue_template
+from execution.test_run_controller import TestRunController
 
 
 class QueueTemplateServiceTests(unittest.TestCase):

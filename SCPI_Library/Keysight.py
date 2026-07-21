@@ -28,6 +28,8 @@ class Subsystem(object):
         state: A boolean representing if the function should be enabled or disabled.
     """
 
+    ERROR_QUERY = "SYST:ERR?"
+
     def __init__(self, VISA_ADDRESS, timeout=None):
         """Initialize the VISA instrument with proper VXI-11 support."""
         self.VISA_ADDRESS = VISA_ADDRESS
@@ -1029,6 +1031,19 @@ class Excavator(Subsystem):
 class Hornbill(Subsystem):
     """Child Class for Hornbill Subsystem"""
 
+    READBACK_MODE_DIAG = "DIAG"
+    READBACK_MODE_SCPI = "SCPI"
+    DEFAULT_VOLTAGE_SAMPLE_COUNT = 100000
+    MAX_VOLTAGE_SAMPLE_COUNT = 512000
+    DIAGNOSTIC_CURRENT_INPUTS = {
+        "200UA": 1,
+        "200MA": 3,
+        "20MA": 4,
+        "2A": 5,
+        "2MA": 6,
+        "FULL": 7,
+    }
+
     def __init__(self, VISA_ADDRESS):
         super().__init__(VISA_ADDRESS)
     
@@ -1050,11 +1065,106 @@ class Hornbill(Subsystem):
     def outputState(self, state, ChannelNumber):
         self.instr.write(f"OUTPut:STATe {state}, (@{ChannelNumber})")
 
-    def measureVoltageDC(self, ChannelNumber):
-        return self.instr.query(f"MEASure:VOLTage:DC? (@{ChannelNumber})")
-    
+    def setVoltageSweepPoints(
+        self,
+        ChannelNumber,
+        sample=DEFAULT_VOLTAGE_SAMPLE_COUNT,
+    ):
+        try:
+            sample_count = int(sample)
+        except (TypeError, ValueError) as exception:
+            raise ValueError("Voltage sample count must be an integer") from exception
+
+        if sample_count < 1 or sample_count > self.MAX_VOLTAGE_SAMPLE_COUNT:
+            raise ValueError(
+                "Voltage sample count must be between 1 and "
+                f"{self.MAX_VOLTAGE_SAMPLE_COUNT}"
+            )
+
+        self.instr.write(
+            f"SENSe:SWEep:POINts {sample_count}, (@{ChannelNumber})"
+        )
+        return self.instr.query("SYST:ERR?")
+
+    def queryVoltageSweepPoints(self, ChannelNumber):
+        return self.instr.query(f"SENSe:SWEep:POINts? (@{ChannelNumber})")
+
+    def measureVoltageArray(self,ChannelNumber,sample=DEFAULT_VOLTAGE_SAMPLE_COUNT,):
+        self.setVoltageSweepPoints(ChannelNumber, sample)
+        return self.instr.query(f"MEAS:ARR:VOLT? (@{ChannelNumber})")
+
+    def measureVoltageDC(self,ChannelNumber,):
+        return self.instr.query(f"MEAS:VOLT:DC? (@{ChannelNumber})")
+
     def measureCurrentDC(self, ChannelNumber):
         return self.instr.query(f"MEASure:CURRent:DC? (@{ChannelNumber})")
+
+    @classmethod
+    def normalizeReadbackMode(cls, mode):
+        normalized_mode = str(mode or cls.READBACK_MODE_DIAG).strip().upper()
+        if normalized_mode not in {
+            cls.READBACK_MODE_DIAG,
+            cls.READBACK_MODE_SCPI,
+        }:
+            raise ValueError(
+                "Hornbill readback mode must be either DIAG or SCPI"
+            )
+        return normalized_mode
+
+    @staticmethod
+    def _firstMeasurementValue(response):
+        if isinstance(response, bytes):
+            response = response.decode("ascii")
+        return float(str(response).strip().split(",", 1)[0])
+
+    def measureReadbackVoltage(
+        self,
+        ChannelNumber,
+        mode=READBACK_MODE_DIAG,
+        sample=DEFAULT_VOLTAGE_SAMPLE_COUNT,
+    ):
+        if self.normalizeReadbackMode(mode) == self.READBACK_MODE_SCPI:
+            self.setVoltageSweepPoints(ChannelNumber, sample)
+            response = self.measureVoltageDC(ChannelNumber)
+        else:
+            sample_count = int(sample)
+            if sample_count < 1 or sample_count > self.MAX_VOLTAGE_SAMPLE_COUNT:
+                raise ValueError(
+                    "Voltage sample count must be between 1 and "
+                    f"{self.MAX_VOLTAGE_SAMPLE_COUNT}"
+                )
+            response = self.instr.query(f"DIAG:PEEK? 20,0,{sample_count}")
+        return self._firstMeasurementValue(response)
+
+    def measureReadbackCurrent(
+        self,
+        ChannelNumber,
+        mode=READBACK_MODE_DIAG,
+        diagnostic_input="FULL",
+        sample=DEFAULT_VOLTAGE_SAMPLE_COUNT,
+    ):
+        if self.normalizeReadbackMode(mode) == self.READBACK_MODE_SCPI:
+            self.setVoltageSweepPoints(ChannelNumber, sample)
+            response = self.measureCurrentDC(ChannelNumber)
+        else:
+            input_name = str(diagnostic_input).replace("_", "").upper()
+            try:
+                selector = self.DIAGNOSTIC_CURRENT_INPUTS[input_name]
+            except KeyError as exception:
+                supported = ", ".join(self.DIAGNOSTIC_CURRENT_INPUTS)
+                raise ValueError(
+                    f"Unsupported Hornbill DIAG current input. Use: {supported}"
+                ) from exception
+            sample_count = int(sample)
+            if sample_count < 1 or sample_count > self.MAX_VOLTAGE_SAMPLE_COUNT:
+                raise ValueError(
+                    "Current sample count must be between 1 and "
+                    f"{self.MAX_VOLTAGE_SAMPLE_COUNT}"
+                )
+            response = self.instr.query(
+                f"DIAG:PEEK? 20,{selector},{sample_count}"
+            )
+        return self._firstMeasurementValue(response)
     
     def askSourCurrentLimitPOSImmediateAmplitude(self, Condition, ChannelNumber):
         return self.instr.query(f"SOURce:CURRent:LIMit:POSitive:IMMediate:AMPLitude? {Condition}, (@{ChannelNumber})")
@@ -1289,8 +1399,16 @@ class Oscilloscope(Subsystem):
 class DMM_3458A(Subsystem):
     """Child Class for 3458A Subsystem"""
 
+    ERROR_QUERY = "ERR?"
+
     def __init__(self, VISA_ADDRESS):
         super().__init__(VISA_ADDRESS)
+
+    def queryID(self):
+        return self.instr.query("ID?")
+
+    def queryError(self):
+        return self.instr.query("ERR?")
 
     def setDCV(self, range):
         self.instr.write(f"DCV {range}")
@@ -1333,6 +1451,63 @@ class DMM_3458A(Subsystem):
 
     def queryMeasurement(self):
         return self.instr.query("TARM SGL,1")
+
+
+class DAQ973A(Subsystem):
+    """SCPI commands for DAQ973A thermocouple temperature measurements."""
+
+    @staticmethod
+    def _channel_list(channels):
+        if isinstance(channels, str):
+            channel_text = channels.strip().removeprefix("(@").removesuffix(")")
+        elif isinstance(channels, (int, float)):
+            channel_text = str(int(channels))
+        else:
+            channel_text = ",".join(str(int(channel)) for channel in channels)
+        if not channel_text:
+            raise ValueError("At least one DAQ channel is required")
+        return f"(@{channel_text})"
+
+    def identify(self):
+        return self.instr.query("*IDN?")
+
+    def clearStatus(self):
+        self.instr.write("*CLS")
+
+    def reset(self):
+        self.instr.write("*RST")
+
+    def configureThermocoupleTemperature(self, channels):
+        self.instr.write(f"CONF:TEMP TC,DEF,{self._channel_list(channels)}")
+
+    def setThermocoupleType(self, thermocouple_type, channels):
+        self.instr.write(
+            "SENS:TEMP:TRAN:TC:TYPE "
+            f"{str(thermocouple_type).upper()},{self._channel_list(channels)}"
+        )
+
+    def setInternalReferenceJunction(self, channels):
+        self.instr.write(
+            f"SENS:TEMP:TRAN:TC:RJUN:TYPE INT,{self._channel_list(channels)}"
+        )
+
+    def setTemperatureNPLC(self, value, channels):
+        self.instr.write(f"SENS:TEMP:NPLC {value},{self._channel_list(channels)}")
+
+    def enableAutomaticChannelDelay(self, channels):
+        self.instr.write(
+            f"ROUT:CHAN:DELAY:AUTO ON,{self._channel_list(channels)}"
+        )
+
+    def setScanChannels(self, channels):
+        self.instr.write(f"ROUT:SCAN {self._channel_list(channels)}")
+
+    def readScan(self):
+        response = self.instr.query("READ?")
+        return [float(value) for value in str(response).strip().split(",")]
+
+    def queryError(self):
+        return self.instr.query("SYST:ERR?")
 
 
 class DMM_344XXA(Subsystem):
@@ -1378,7 +1553,13 @@ class ELOAD_E367XXA(Subsystem):
         self.instr.write(f"FUNC {mode}")
     
     def setOutputCurrent(self, value):
-        self.instr.write(f"CURR {value}")
+        try:
+            numeric_value = float(value)
+        except (TypeError, ValueError):
+            command_value = value
+        else:
+            command_value = "MIN" if numeric_value == 0 else value
+        self.instr.write(f"CURR {command_value}")
     
     def setOutputState(self, state):
         self.instr.write(f"OUTP {state}")

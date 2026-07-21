@@ -9,7 +9,7 @@ for import_path in (SRC, ROOT):
     if str(import_path) not in sys.path:
         sys.path.insert(0, str(import_path))
 
-from configuration_service import (
+from configuration.configuration_service import (
     apply_configuration,
     configuration_path,
     load_configuration,

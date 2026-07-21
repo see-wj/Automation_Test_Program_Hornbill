@@ -8,7 +8,11 @@ for import_path in (SRC, ROOT):
     if str(import_path) not in sys.path:
         sys.path.insert(0, str(import_path))
 
-from test_configuration import build_test_parameters, snapshot_parameters
+from configuration.test_configuration import (
+    build_test_parameters,
+    prepare_run_submission,
+    snapshot_parameters,
+)
 
 
 class Parameters(dict):
@@ -45,6 +49,7 @@ class ConfigurationTests(unittest.TestCase):
             "PSU": "PSU",
             "DMM": "DMM",
             "ELoad": "ELoad",
+            "DAQ": "USB::DAQ",
             "ELoad_Channel": 1,
             "PSU_Channel": [1],
             "VoltageSense": "2-wire",
@@ -53,6 +58,8 @@ class ConfigurationTests(unittest.TestCase):
             "SPOperationMode": "CV",
             "DMM_Model": "DMM",
             "ELoad_Model": "ELoad",
+            "Hornbill_Measurement_Command": "SCPI",
+            "Relay_Control": "Voltage Relay (Channel 3)",
             "Range": "Auto",
             "Aperture": 1,
             "AutoZero": "ON",
@@ -61,6 +68,19 @@ class ConfigurationTests(unittest.TestCase):
             "DownTime": 0,
             "rshunt": 0.1,
             "DMM2": "DMM2",
+            "OSC": "OSC",
+            "OSC_Channel": 1,
+            "Channel_CouplingMode": "DC",
+            "Trigger_Mode": "EDGE",
+            "Trigger_CouplingMode": "DC",
+            "Trigger_SweepMode": "AUTO",
+            "Trigger_SlopeMode": "POS",
+            "Probe_Setting": 10,
+            "Acq_Type": "NORM",
+            "TimeScale": 0.001,
+            "VerticalScale": 1,
+            "V_Settling_Band": 1,
+            "T_Settling_Band": 1,
         })
 
     def test_builds_base_configuration(self):
@@ -68,6 +88,8 @@ class ConfigurationTests(unittest.TestCase):
 
         self.assertEqual(result["DUT"], "Dolphin")
         self.assertEqual(result["InputZ"], "Auto")
+        self.assertEqual(result["Hornbill_Measurement_Command"], "SCPI")
+        self.assertEqual(result["Relay_Control"], "Voltage Relay (Channel 3)")
         self.assertNotIn("DMM2", result)
 
     def test_adds_current_only_fields(self):
@@ -75,6 +97,23 @@ class ConfigurationTests(unittest.TestCase):
 
         self.assertEqual(result["DMM2"], "DMM2")
         self.assertEqual(result["rshunt"], 0.1)
+
+    def test_adds_scope_fields_for_hornbill_capture_mode(self):
+        result = build_test_parameters(
+            self.parameters,
+            {
+                "VoltageAccuracy": True,
+                "CurrentStatic(VoltageChange)withOscilloscope": True,
+            },
+        )
+
+        self.assertEqual(result["OSC"], "OSC")
+        self.assertEqual(result["OSC_Channel"], 1)
+
+    def test_includes_optional_daq_address(self):
+        result = build_test_parameters(self.parameters, {"Temperature": True})
+
+        self.assertEqual(result["DAQ"], "USB::DAQ")
 
     def test_snapshot_is_independent_from_gui_parameters(self):
         self.parameters["PSU_Channel"] = [1]
@@ -84,6 +123,26 @@ class ConfigurationTests(unittest.TestCase):
 
         self.assertEqual(self.parameters.PSU_Channel, [1])
         self.assertEqual(snapshot.PSU_Channel, [1, 2])
+
+    def test_prepares_snapshot_and_label_for_submission(self):
+        selections = {
+            "Voltage_Test": True,
+            "VoltageAccuracy": True,
+            "DataReport": True,
+            "DataImage": False,
+        }
+
+        submission = prepare_run_submission(self.parameters, selections)
+        self.parameters.noofloop = 9
+        selections["VoltageAccuracy"] = False
+
+        self.assertEqual(submission.parameters.noofloop, 1)
+        self.assertTrue(submission.selections["VoltageAccuracy"])
+        self.assertEqual(
+            submission.label,
+            "Dolphin: Voltage_Test, VoltageAccuracy",
+        )
+        self.assertEqual(submission.configuration["DUT"], "Dolphin")
 
 
 if __name__ == "__main__":

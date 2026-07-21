@@ -8,7 +8,7 @@ for import_path in (SRC, ROOT):
     if str(import_path) not in sys.path:
         sys.path.insert(0, str(import_path))
 
-from test_run_controller import TestRunController
+from execution.test_run_controller import TestRunController
 
 
 class DummySignal:
@@ -31,6 +31,7 @@ class DummyWorker:
         self.finished = DummySignal()
         self.aborted = DummySignal()
         self.error = DummySignal()
+        self.state_changed = DummySignal()
         self.running = False
         self.pause_calls = 0
         self.resume_calls = 0
@@ -44,12 +45,15 @@ class DummyWorker:
 
     def pause(self):
         self.pause_calls += 1
+        self.state_changed.emit("PAUSED")
 
     def resume(self):
         self.resume_calls += 1
+        self.state_changed.emit("RUNNING")
 
     def request_stop(self):
         self.stop_calls += 1
+        self.state_changed.emit("STOPPING")
 
 
 class TestRunQueueTests(unittest.TestCase):
@@ -87,13 +91,111 @@ class TestRunQueueTests(unittest.TestCase):
         self.assertEqual(len(self.workers), 2)
         self.assertEqual(self.workers[1].checkbox_states["name"], "second")
 
+    def test_worker_failure_halts_pending_queue_until_manual_resume(self):
+        halted = []
+        self.controller.queue_halted.connect(
+            lambda request, status: halted.append((request.label, status))
+        )
+        first = self.controller.start({}, {}, {}, label="first")
+        second = self.controller.enqueue({}, {}, {}, label="second")
+
+        self.workers[0].running = False
+        self.workers[0].error.emit(RuntimeError("failed"), "traceback")
+
+        self.assertEqual(halted, [("first", "Failed")])
+        self.assertEqual(self.controller.status_for(first.run_id), "Failed")
+        self.assertEqual(self.controller.status_for(second.run_id), "Pending")
+        self.assertEqual(self.controller.pending_count, 1)
+        self.assertIsNone(self.controller.active_worker)
+        self.assertEqual(len(self.workers), 1)
+
+        self.controller.start_queue()
+
+        self.assertEqual(len(self.workers), 2)
+        self.assertEqual(self.controller.status_for(second.run_id), "Running")
+
+    def test_queue_can_opt_into_continuing_after_failure(self):
+        workers = []
+
+        def factory(*args):
+            worker = DummyWorker(*args)
+            workers.append(worker)
+            return worker
+
+        controller = TestRunController(
+            worker_factory=factory,
+            halt_on_failure=False,
+        )
+        controller.start({}, {}, {}, label="first")
+        second = controller.enqueue({}, {}, {}, label="second")
+
+        workers[0].running = False
+        workers[0].error.emit(RuntimeError("failed"), "traceback")
+        controller._start_next()
+
+        self.assertEqual(len(workers), 2)
+        self.assertEqual(controller.status_for(second.run_id), "Running")
+
+    def test_final_failure_still_finishes_empty_queue(self):
+        finished = []
+        halted = []
+        self.controller.queue_finished.connect(lambda: finished.append(True))
+        self.controller.queue_halted.connect(lambda *_: halted.append(True))
+        self.controller.start({}, {}, {}, label="only run")
+
+        self.workers[0].running = False
+        self.workers[0].error.emit(RuntimeError("failed"), "traceback")
+        self.controller._start_next()
+
+        self.assertEqual(finished, [True])
+        self.assertEqual(halted, [])
+
+    def test_setup_failure_halts_pending_queue(self):
+        halted = []
+        self.controller.queue_halted.connect(
+            lambda request, status: halted.append((request.label, status))
+        )
+        failed = self.controller.enqueue(
+            {},
+            {},
+            {},
+            label="invalid setup",
+            prepare=lambda _request: (_ for _ in ()).throw(
+                RuntimeError("setup failed")
+            ),
+            auto_start=False,
+        )
+        pending = self.controller.enqueue(
+            {},
+            {},
+            {},
+            label="pending",
+            auto_start=False,
+        )
+
+        self.controller.start_queue()
+
+        self.assertEqual(halted, [("invalid setup", "Failed")])
+        self.assertEqual(self.controller.status_for(failed.run_id), "Failed")
+        self.assertEqual(self.controller.status_for(pending.run_id), "Pending")
+        self.assertEqual(self.controller.pending_count, 1)
+        self.assertEqual(self.workers, [])
+
+        self.controller.start_queue()
+
+        self.assertEqual(len(self.workers), 1)
+        self.assertEqual(self.controller.status_for(pending.run_id), "Running")
+
     def test_pause_resume_and_stop_delegate_to_worker(self):
-        self.controller.start({}, {}, {})
+        request = self.controller.start({}, {}, {})
         worker = self.workers[0]
 
         self.controller.pause()
+        self.assertEqual(self.controller.status_for(request.run_id), "Paused")
         self.controller.resume()
+        self.assertEqual(self.controller.status_for(request.run_id), "Running")
         self.controller.request_stop()
+        self.assertEqual(self.controller.status_for(request.run_id), "Stopping")
 
         self.assertEqual(worker.pause_calls, 1)
         self.assertEqual(worker.resume_calls, 1)
@@ -156,6 +258,36 @@ class TestRunQueueTests(unittest.TestCase):
         self.assertEqual(self.controller.status_for(request.run_id), "Failed")
         self.assertIsNone(self.controller.retry(retry.run_id))
 
+    def test_interrupted_run_requires_manual_retry(self):
+        request = self.controller.restore_interrupted(
+            {"Voltage_Test": True},
+            {"DUT": "Dolphin"},
+            {"noofloop": "1"},
+            label="Recovered voltage",
+            run_id="interrupted-1",
+            recovery_run_directory="runs/interrupted-1",
+        )
+
+        self.assertEqual(self.controller.pending_count, 0)
+        self.assertEqual(self.workers, [])
+        self.assertEqual(self.controller.status_for(request.run_id), "Interrupted")
+        self.assertEqual(self.controller.interrupted_requests, (request,))
+
+        retry = self.controller.retry(request.run_id)
+
+        self.assertIsNotNone(retry)
+        self.assertEqual(retry.label, "Recovered voltage (Retry)")
+        self.assertEqual(self.controller.status_for(request.run_id), "Retried")
+        self.assertEqual(self.controller.pending_count, 1)
+        self.assertEqual(self.workers, [])
+
+    def test_interrupted_run_can_be_dismissed(self):
+        request = self.controller.restore_interrupted({}, {}, {}, run_id="old-run")
+
+        self.assertTrue(self.controller.remove_pending(request.run_id))
+        self.assertEqual(self.controller.status_for(request.run_id), "Removed")
+        self.assertEqual(self.controller.interrupted_requests, ())
+
     def test_terminal_history_prunes_old_requests_at_configured_limit(self):
         workers = []
 
@@ -205,6 +337,30 @@ class TestRunQueueTests(unittest.TestCase):
         self.assertEqual(prepared, ["first", "second"])
         self.assertIn(("first", "Completed"), statuses)
         self.assertIn(("second", "Running"), statuses)
+
+    def test_active_snapshot_refreshes_after_prepare(self):
+        parameters = {"prepared": False}
+        active_snapshots = []
+
+        def capture_active():
+            if self.controller.active_request:
+                active_snapshots.append(
+                    self.controller.active_request.parameters["prepared"]
+                )
+
+        self.controller.persistence_changed.connect(capture_active)
+        self.controller.enqueue(
+            {},
+            {},
+            parameters,
+            prepare=lambda request: request.parameters.update(prepared=True),
+            auto_start=False,
+        )
+
+        self.controller.start_queue()
+
+        self.assertIn(False, active_snapshots)
+        self.assertEqual(active_snapshots[-1], True)
 
     def test_setup_failure_marks_request_failed_without_worker(self):
         statuses = []

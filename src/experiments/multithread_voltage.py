@@ -63,7 +63,7 @@ class MultiThreadVoltageMeasurementDialog(QDialog):
     DUT Test, the program will compile all the parameters into a dictionary which will be passed as an argument
     into the test methods and execute the DUT Tests accordingly.
 
-    For more details regarding the arguements, please refer to DUT_Test.py
+    For more details regarding the arguments, see DUT_Test_Scripts/Dolphin/DUT_Test.py.
 
 
     """
@@ -750,7 +750,10 @@ class MultiThreadVoltageMeasurementDialog(QDialog):
             self.QLineEdit_DMM_VisaAddress.clear()
             self.QLineEdit_ELoad_VisaAddress.clear()
             
-            self.visaIdList, self.nameList, instrument_roles = NewGetVisaSCPIResources()
+            discovery = NewGetVisaSCPIResources()
+            self.visaIdList = discovery.addresses
+            self.nameList = discovery.identities
+            instrument_roles = discovery.roles
             
             for i in range(len(self.nameList)):
                 self.OutputBox.append(str(self.nameList[i]) + str(self.visaIdList[i]))

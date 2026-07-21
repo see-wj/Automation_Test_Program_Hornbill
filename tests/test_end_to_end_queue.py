@@ -15,11 +15,17 @@ from PyQt5.QtCore import QEventLoop, QTimer
 from PyQt5.QtWidgets import QApplication
 
 import GUI
-from DUT_Test_Scripts import DUT_Test as dut_measurements
-from DUT_Test_Scripts import Hornbill_DUT_Test_With_ELoad as hornbill_measurements
-from SCPI_Library.session_manager import close_visa_session_scope
-from SCPI_Library.simulation import get_simulation_state, reset_simulation
-from test_configuration import ParameterSnapshot
+from ui import all_test_dialog
+from DUT_Test_Scripts.Dolphin import DUT_Test as dut_measurements
+from DUT_Test_Scripts.Hornbill import Hornbill_DUT_Test_With_ELoad as hornbill_measurements
+from SCPI_Library.session_manager import close_visa_session_scope, get_visa_resource
+from SCPI_Library.simulation import (
+    clear_simulation_faults,
+    get_simulation_state,
+    inject_simulation_fault,
+    reset_simulation,
+)
+from configuration.test_configuration import ParameterSnapshot
 
 
 class EndToEndQueueTests(unittest.TestCase):
@@ -68,6 +74,7 @@ class EndToEndQueueTests(unittest.TestCase):
             "maxVoltage": 5,
             "voltage_step_size": 1,
             "DownTime": 0,
+            "rshunt": 0.01,
             "Voltage_Rating": 5,
             "Current_Rating": 2,
             "I_Rating": 2,
@@ -108,6 +115,25 @@ class EndToEndQueueTests(unittest.TestCase):
         loop.exec_()
         timer.stop()
         self.assertFalse(timed_out, "simulated queue did not finish in time")
+
+    def _wait_for_signal(self, signal, starter, timeout_ms=20000):
+        loop = QEventLoop()
+        timed_out = []
+        signal.connect(loop.quit)
+
+        def timeout():
+            timed_out.append(True)
+            loop.quit()
+
+        timer = QTimer()
+        timer.setSingleShot(True)
+        timer.timeout.connect(timeout)
+        timer.start(timeout_ms)
+        starter()
+        loop.exec_()
+        timer.stop()
+        signal.disconnect(loop.quit)
+        self.assertFalse(timed_out, "expected queue signal was not emitted")
 
     def test_real_workers_run_two_duts_and_isolate_artifacts(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict(
@@ -182,6 +208,54 @@ class EndToEndQueueTests(unittest.TestCase):
             dialog.deleteLater()
             self.application.processEvents()
 
+    def test_current_accuracy_streams_realtime_data(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ, {"AUTOMATION_SIMULATION": "1"}, clear=False
+        ), patch.object(
+            dut_measurements, "sleep", lambda *_: None
+        ), patch.object(
+            GUI, "show_error_dialog"
+        ) as error_dialog:
+            dialog = GUI.AllTestMeasurement(
+                queue_file=Path(directory) / "current_queue.json"
+            )
+            dialog._handle_realtime_measurement_failure = lambda _measurement: None
+            selections, configuration, parameters = self._request_data(
+                directory,
+                "Dolphin",
+                "CURRENT",
+            )
+            selections.update(
+                Voltage_Test=False,
+                VoltageAccuracy=False,
+                Current_Test=True,
+                CurrentAccuracy=True,
+                CurrentAccuracy_20A_Range=True,
+            )
+            dialog.run_controller.enqueue(
+                selections,
+                configuration,
+                parameters,
+                label="Dolphin current accuracy",
+                prepare=dialog._prepare_queued_run,
+                auto_start=False,
+            )
+
+            self._run_event_loop(dialog.run_controller)
+
+            error_dialog.assert_not_called()
+            self.assertEqual(dialog.realtime_plot_series.counter, 1)
+            run_directory = next(
+                path for path in Path(directory).iterdir() if path.is_dir()
+            )
+            realtime_file = next(
+                (run_directory / "raw").glob("realtime_voltage_data_*.csv")
+            )
+            self.assertEqual(len(realtime_file.read_text().splitlines()), 2)
+            dialog.close()
+            dialog.deleteLater()
+            self.application.processEvents()
+
     def test_pause_resume_and_abort_continue_to_next_real_worker(self):
         worker_states = []
         dispatched_units = []
@@ -250,6 +324,77 @@ class EndToEndQueueTests(unittest.TestCase):
             self.assertIn(("Continue controlled run", "Completed"), statuses)
             self.assertEqual(dialog.run_controller.pending_count, 0)
             self.assertIsNone(dialog.run_controller.active_worker)
+
+            dialog.close()
+            dialog.deleteLater()
+            self.application.processEvents()
+
+    def test_timeout_halts_queue_then_recovers_after_fault_is_cleared(self):
+        dmm_address = "USB0::SIM::DMM::INSTR"
+        errors = []
+        statuses = []
+
+        def measurement_dispatch(worker, _loop_index):
+            psu = get_visa_resource(worker.params["PSU"])
+            dmm = get_visa_resource(worker.params["DMM"])
+            psu.write("VOLT 5")
+            psu.write("OUTP ON")
+            float(dmm.query("MEAS:VOLT:DC?"))
+
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ, {"AUTOMATION_SIMULATION": "1"}, clear=False
+        ), patch.object(
+            GUI.TestWorker, "_dispatch_dut_tests", measurement_dispatch
+        ), patch.object(
+            all_test_dialog,
+            "show_error_dialog",
+            side_effect=lambda _, error, __: errors.append(error),
+        ):
+            dialog = GUI.AllTestMeasurement(
+                queue_file=Path(directory) / "recovery_queue.json"
+            )
+            dialog.run_controller.request_status_changed.connect(
+                lambda request, status: statuses.append((request.label, status))
+            )
+            for label in ("Faulted run", "Recovery run"):
+                selections, configuration, parameters = self._request_data(
+                    directory, "Dolphin", label.replace(" ", "_")
+                )
+                selections["DataReport"] = False
+                dialog.run_controller.enqueue(
+                    selections,
+                    configuration,
+                    parameters,
+                    label=label,
+                    prepare=dialog._prepare_queued_run,
+                    auto_start=False,
+                )
+
+            inject_simulation_fault(
+                "query", "timeout", resource_name=dmm_address
+            )
+            self._wait_for_signal(
+                dialog.run_controller.queue_halted,
+                dialog.run_controller.start_queue,
+            )
+
+            self.assertEqual(dialog.run_controller.pending_count, 1)
+            self.assertIsNone(dialog.run_controller.active_worker)
+            self.assertFalse(get_simulation_state().output_enabled)
+            self.assertEqual(len(errors), 1)
+            self.assertEqual(errors[0].context["role"], "DMM")
+            self.assertEqual(errors[0].context["operation"], "query")
+
+            clear_simulation_faults()
+            self._wait_for_signal(
+                dialog.run_controller.queue_finished,
+                dialog.run_controller.start_queue,
+            )
+
+            self.assertIn(("Faulted run", "Failed"), statuses)
+            self.assertIn(("Recovery run", "Completed"), statuses)
+            self.assertEqual(dialog.run_controller.pending_count, 0)
+            self.assertFalse(get_simulation_state().output_enabled)
 
             dialog.close()
             dialog.deleteLater()

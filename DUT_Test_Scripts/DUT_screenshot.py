@@ -3,6 +3,7 @@ import  shutil
 import os
 import pyvisa
 from SCPI_Library.simulation import create_resource_manager
+from SCPI_Library.visa_config import configure_visa_resource
 from PIL import Image, ImageDraw, ImageFont
 from time import sleep
 
@@ -610,45 +611,62 @@ def GetKeysightU2004ADeviceScreenShot(instr):
 # --------------------------------------------------------------------------- #
 
 
-def GetVisaSCPIResources():
-    """Return a list of only *connected* USB VISA instruments."""
-    rm = create_resource_manager()
-    resource_list = rm.list_resources()
+def normalize_network_visa_address(network_target):
+    target = str(network_target or "").strip()
+    if not target:
+        return ""
+    if target.upper().startswith("TCPIP"):
+        if target.upper().endswith(("::INSTR", "::SOCKET")):
+            return target
+        return f"{target}::inst0::INSTR"
+    return f"TCPIP0::{target}::inst0::INSTR"
+
+
+def GetVisaSCPIResources(network_target=None, resource_manager_factory=None):
+    """Return connected USB/TCPIP instruments plus an optional network target."""
+    factory = resource_manager_factory or create_resource_manager
+    rm = factory()
+    resource_list = [
+        resource
+        for resource in rm.list_resources()
+        if str(resource).upper().startswith(("USB", "TCPIP"))
+    ]
+    manual_address = normalize_network_visa_address(network_target)
+    if manual_address and manual_address not in resource_list:
+        resource_list.append(manual_address)
 
     available_visa_ids = []
     available_names = []
 
-    for resource in resource_list:
-        # Only look for USB instruments (skip GPIB, TCPIP, etc.)
-        if not resource.startswith("USB"):
-            continue
+    try:
+        for resource in resource_list:
+            instrument = None
+            try:
+                instrument = configure_visa_resource(
+                    rm.open_resource(resource),
+                    5000 if str(resource).upper().startswith("TCPIP") else 2000,
+                )
+                idn = instrument.query("*IDN?").strip().upper()
+                if idn and "," in idn:
+                    available_visa_ids.append(resource)
+                    available_names.append(idn)
 
+            except pyvisa.errors.VisaIOError as e:
+                if e.error_code not in (-1073807343, -1073807339, -1073807298):
+                    print(f"VISA I/O Error ({e.error_code}) on {resource}: {e}")
+            except Exception as e:
+                print(f"Unexpected error with {resource}: {e}")
+            finally:
+                if instrument is not None:
+                    try:
+                        instrument.close()
+                    except Exception:
+                        pass
+    finally:
         try:
-            # Try to open the resource
-            instrument = rm.open_resource(resource)
-            instrument.timeout = 2000  # shorter timeout for faster scanning
-
-            # Check connectivity with *IDN? (identify command)
-            idn = instrument.query("*IDN?").strip().upper()
-
-            # Only add if response looks valid
-            if idn and "," in idn:
-                available_visa_ids.append(resource)
-                available_names.append(idn)
-
-        except pyvisa.errors.VisaIOError as e:
-            # Filter out common errors for disconnected devices
-            if e.error_code in (-1073807343, -1073807339, -1073807298):
-                # -1073807343: Resource not found
-                # -1073807339: Timeout
-                # -1073807298: I/O error
-                continue  # Skip silently
-            else:
-                print(f"VISA I/O Error ({e.error_code}) on {resource}: {e}")
-                continue
-        except Exception as e:
-            print(f"Unexpected error with {resource}: {e}")
-            continue
+            rm.close()
+        except Exception:
+            pass
 
     return available_visa_ids, available_names
 # --------------------------------------------------------------------------- #
@@ -722,6 +740,15 @@ class ScreenShotDialog(QDialog):
         self.doFindButton = QPushButton('Find Instruments', self)
         self.doFindButton.move(xOrigin + 0*xSpanGroup, yOrigin)
         self.doFindButton.clicked.connect(self.doFind)
+
+        self.networkAddressLabel = QLabel('Hostname / IP (optional)', self)
+        self.networkAddressLabel.move(xOrigin + xSpanGroup, yOrigin - 18)
+        self.networkAddressEntry = QLineEdit(self)
+        self.networkAddressEntry.setPlaceholderText(
+            'Example: p700-95640339 or 141.183.188.184'
+        )
+        self.networkAddressEntry.move(xOrigin + xSpanGroup, yOrigin)
+        self.networkAddressEntry.resize(260, 24)
 
         # create SCPI dino label
         self.scpiDinoLabel = QLabel('',self)
@@ -840,10 +867,12 @@ class ScreenShotDialog(QDialog):
         try:
             self.instrTable.clear()
             self.instrTable.setHorizontalHeaderLabels(['Name','Description','Manufacturer','VISA ID'])
-            self.visaIdList, self.nameList = GetVisaSCPIResources()
+            network_target = self.networkAddressEntry.text().strip()
+            self.visaIdList, self.nameList = GetVisaSCPIResources(network_target)
             self.instrTable.setRowCount(len(self.nameList))
             for i in range(len(self.nameList)):
                 nameListComps = self.nameList[i].split(',')
+                nameListComps.extend([""] * (4 - len(nameListComps)))
                 mfgName       = nameListComps[0].strip()
                 instrName     = nameListComps[1].strip()
                 serialNo      = nameListComps[2].strip()

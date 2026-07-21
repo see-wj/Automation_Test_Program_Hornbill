@@ -1,7 +1,12 @@
 import os
 import re
 import sys
+import threading
 from dataclasses import dataclass, field
+
+import pyvisa
+
+from SCPI_Library.instrument_errors import ReportGenerationError
 
 
 SIMULATION_ENVIRONMENT_VARIABLE = "AUTOMATION_SIMULATION"
@@ -21,6 +26,28 @@ class SimulationState:
     output_enabled: bool = False
     selected_channel: int = 1
     command_log: list = field(default_factory=list)
+    faults: list = field(default_factory=list)
+
+
+@dataclass
+class SimulationFault:
+    operation: str
+    error: str
+    resource_name: str = None
+    command_pattern: str = None
+    after: int = 0
+    remaining: int = 1
+
+    def matches(self, operation, resource_name=None, command=None):
+        if self.operation != operation:
+            return False
+        if self.resource_name and self.resource_name != resource_name:
+            return False
+        if self.command_pattern and not re.search(
+            self.command_pattern, str(command or ""), re.IGNORECASE
+        ):
+            return False
+        return True
 
 
 SIMULATED_INSTRUMENTS = {
@@ -34,6 +61,7 @@ SIMULATED_INSTRUMENTS = {
 
 
 _simulation_state = SimulationState()
+_main_thread_resource_manager = None
 
 
 def get_simulation_state():
@@ -44,6 +72,57 @@ def reset_simulation():
     global _simulation_state
     _simulation_state = SimulationState()
     return _simulation_state
+
+
+def inject_simulation_fault(
+    operation,
+    error,
+    resource_name=None,
+    command_pattern=None,
+    after=0,
+    repeat=1,
+):
+    if after < 0 or repeat < 1:
+        raise ValueError("after must be non-negative and repeat must be positive")
+    fault = SimulationFault(
+        operation=str(operation),
+        error=str(error),
+        resource_name=str(resource_name) if resource_name else None,
+        command_pattern=command_pattern,
+        after=int(after),
+        remaining=int(repeat),
+    )
+    get_simulation_state().faults.append(fault)
+    return fault
+
+
+def clear_simulation_faults():
+    get_simulation_state().faults.clear()
+
+
+def raise_for_simulation_fault(operation, resource_name=None, command=None):
+    state = get_simulation_state()
+    for fault in tuple(state.faults):
+        if not fault.matches(operation, resource_name, command):
+            continue
+        if fault.after:
+            fault.after -= 1
+            continue
+        fault.remaining -= 1
+        if not fault.remaining:
+            state.faults.remove(fault)
+        if fault.error == "timeout":
+            raise pyvisa.VisaIOError(pyvisa.constants.StatusCode.error_timeout)
+        if fault.error == "disconnect":
+            raise pyvisa.VisaIOError(pyvisa.constants.StatusCode.error_connection_lost)
+        if fault.error == "report":
+            raise ReportGenerationError(
+                "Simulated report generation failure",
+                operation=operation,
+            )
+        if fault.error == "cleanup":
+            raise RuntimeError("Simulated cleanup failure")
+        raise ValueError(f"Unknown simulation fault type: {fault.error}")
 
 
 class SimulatedVisaResource:
@@ -65,6 +144,7 @@ class SimulatedVisaResource:
         return False
 
     def close(self):
+        raise_for_simulation_fault("close", self.resource_name)
         self.closed = True
 
     def clear(self):
@@ -72,6 +152,7 @@ class SimulatedVisaResource:
 
     def write(self, message):
         command = str(message).strip()
+        raise_for_simulation_fault("write", self.resource_name, command)
         self.state.command_log.append((self.resource_name, command))
         normalized = command.upper()
         value = self._programming_value(command)
@@ -96,6 +177,7 @@ class SimulatedVisaResource:
 
     def query(self, message):
         command = str(message).strip()
+        raise_for_simulation_fault("query", self.resource_name, command)
         self.state.command_log.append((self.resource_name, command))
         normalized = command.upper()
 
@@ -148,6 +230,7 @@ class SimulatedVisaResource:
         return self.write_ascii_values(message, values, *args, **kwargs)
 
     def read(self):
+        raise_for_simulation_fault("read", self.resource_name)
         return f"{self._measured_value():.9f}\n"
 
     def read_raw(self):
@@ -204,6 +287,7 @@ class SimulatedVisaResourceManager:
 
     def open_resource(self, address, *args, **kwargs):
         key = str(address)
+        raise_for_simulation_fault("connect", key)
         if key not in SIMULATED_INSTRUMENTS:
             raise ValueError(f"Unknown simulated VISA resource: {key}")
         resource = SimulatedVisaResource(
@@ -216,6 +300,7 @@ class SimulatedVisaResourceManager:
         return resource
 
     def close(self):
+        raise_for_simulation_fault("close_manager", "VISA ResourceManager")
         self.closed = True
 
 
@@ -226,3 +311,15 @@ def create_resource_manager():
     import pyvisa
 
     return pyvisa.ResourceManager()
+
+
+def initialize_main_thread_visa():
+    global _main_thread_resource_manager
+    if is_simulation_mode():
+        return None
+    if threading.current_thread() is not threading.main_thread():
+        raise RuntimeError("VISA must be initialized from the main thread")
+    if _main_thread_resource_manager is None:
+        _main_thread_resource_manager = pyvisa.ResourceManager()
+        _main_thread_resource_manager.list_resources()
+    return _main_thread_resource_manager
