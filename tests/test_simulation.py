@@ -60,6 +60,26 @@ class SimulationTests(unittest.TestCase):
         self.assertEqual(manager.list_calls, 1)
         resource_manager.assert_called_once_with()
 
+    def test_simulated_main_thread_visa_supports_diagnostics(self):
+        with patch.dict(
+            os.environ,
+            {"AUTOMATION_SIMULATION": "1"},
+            clear=False,
+        ), patch.object(
+            simulation,
+            "_main_thread_resource_manager",
+            None,
+        ):
+            first = initialize_main_thread_visa()
+            second = initialize_main_thread_visa()
+
+        self.assertIs(first, second)
+        self.assertEqual("Simulated VISA backend", first.visalib)
+        self.assertEqual(
+            tuple(SIMULATED_INSTRUMENTS),
+            first.list_resources(),
+        )
+
     def test_simulated_manager_exposes_expected_instrument_roles(self):
         with patch.dict(os.environ, {"AUTOMATION_SIMULATION": "1"}, clear=False):
             result = GUI.NewGetVisaSCPIResources()

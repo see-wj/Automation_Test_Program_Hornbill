@@ -1,0 +1,8 @@
+{
+  "version": "0.2.0",
+  "package_url": "Test_Automation_Program-0.2.0.zip",
+  "sha256": "REPLACE_WITH_64_CHARACTER_SHA256",
+  "executable": "Test_Automation_Program.exe",
+  "mandatory": false,
+  "release_notes": "Describe the changes in this release."
+}

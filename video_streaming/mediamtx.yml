@@ -1,0 +1,12 @@
+logLevel: info
+logDestinations: [file]
+logFile: logs/mediamtx.log
+
+rtspAddress: 127.0.0.1:8554
+hlsAddress: 127.0.0.1:8888
+hlsAlwaysRemux: true
+hlsVariant: mpegts
+
+paths:
+  hornbill:
+    source: publisher

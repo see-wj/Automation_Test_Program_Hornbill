@@ -7,7 +7,11 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from ui.realtime_plot import RealtimeMeasurement, RealtimePlotSeries
+from ui.realtime_plot import (
+    RealtimeMeasurement,
+    RealtimePlotSeries,
+    report_percentage_error,
+)
 
 
 def measurement(programming_error=0.1, readback_error=0.2):
@@ -31,6 +35,11 @@ def measurement(programming_error=0.1, readback_error=0.2):
 
 
 class RealtimePlotTests(unittest.TestCase):
+    def test_report_percentage_uses_specification_limit(self):
+        self.assertEqual(report_percentage_error(0.1, 0.5), 20.0)
+        self.assertEqual(report_percentage_error(0.05, 0.5), 10.0)
+        self.assertEqual(report_percentage_error(0.0, 0.0), 0.0)
+
     def test_measurement_exposes_complete_csv_row_and_status(self):
         point = measurement()
 

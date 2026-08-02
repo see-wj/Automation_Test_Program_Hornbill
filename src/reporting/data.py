@@ -40,6 +40,7 @@ def configure_run_storage(raw_directory, chart_directory):
     POWER_INSTRUMENT_DATA_PATH = raw_directory / "powerinstrumentData.csv"
     POWER_IMAGE_PATH = chart_directory / "powerChart.png"
 
+
 #------------------Instrument Data Collection---------------------
 class instrumentData(object):
     """Stores instrument IDN and SCPI version, safely handling missing or invalid addresses."""
@@ -146,10 +147,12 @@ class datatoCSV_Accuracy:
                     #PSU Readback Measurement
                     Vreadback = pd.Series(self.column(dataList2, 0))
                     Ireadback = pd.Series(self.column(dataList2, 1))
+                    Vlocal = pd.Series(self.column(dataList2, 2))
 
 
 
                     Vreadback_error = (Vreadback - Vmeasured) 
+                    Vlocal_error = Vlocal - Vreadback
                     Ireadback_error = (Ireadback - Imeasured) 
 
                     Vreadback_percent_error = Vreadback_error
@@ -159,14 +162,19 @@ class datatoCSV_Accuracy:
                     # Convert Series to DataFrames
                     columns = {
                         #Programming Accuracy
+                        "PSU Voltage Set": Vset, "Load Current Set": Iset,
                         "PSU Readback Voltage": Vreadback, "PSU Readback Current" : Ireadback,
-                        "PSU Voltage Set": Vset, "Load Current Set": Iset, "DMM Voltage Measured": Vmeasured,
+                        "DMM Voltage Measured": Vmeasured,
                         "key": Key, "Programming/Voltage Absolute Error (V)": ProgrammingV_error,"Relative/Voltage Percentage Error (%)": Vpercent_error,   
                         "PSU Readback Voltage Error (V)": Vreadback_error, "PSU Readback Voltage Percentage Error (%)": Vreadback_percent_error,
                       
     
                         
                     }
+                    if any(len(row) > 2 for row in dataList2):
+                        columns["PSU Local Voltage (VLOC)"] = Vlocal
+                        columns["PSU Local Voltage Error (V)"] = Vlocal_error
+
                     CSV1 = pd.DataFrame(columns)
 
                     # Save to CSV
@@ -226,6 +234,7 @@ class datatoCSV_Accuracy2:
                     #PSU Readback Measurement
                     Vreadback = pd.Series(self.column(dataList2, 0))
                     Ireadback = pd.Series(self.column(dataList2, 1))
+                    Vlocal = pd.Series(self.column(dataList2, 2))
 
                     Ireadback_error = (Ireadback - Imeasured) 
                     Ireadback_percent_error = (
@@ -243,6 +252,9 @@ class datatoCSV_Accuracy2:
                         "PSU Readback Current Error (A)": Ireadback_error, "PSU Readback Current Percentage Error (%)": Ireadback_percent_error
 
                     }
+                    if any(len(row) > 2 for row in dataList2):
+                        columns["PSU Local Voltage (VLOC)"] = Vlocal
+
                     CSV1 = pd.DataFrame(columns)
 
                     # Save to CSV
@@ -561,6 +573,11 @@ class datatoGraph(datatoCSV_Accuracy):
 
                     # Combine all DataFrames into a single DataFrame
                     combined_df = pd.concat([ungrouped_df, upper_error_limitF, lower_error_limitF, conditionFF, upper_error_limitF2, lower_error_limitF2, conditionFF2, upper_error_limitF_percent, lower_error_limitF_percent, conditionFF_percent, upper_error_limitF2_percent, lower_error_limitF2_percent, conditionFF2_percent], axis=1)
+                    combined_df["Chart Mode"] = "VOLTAGE_STATIC"
+                    combined_df["Chart X"] = combined_df["PSU Voltage Set"]
+                    combined_df["Chart Group"] = combined_df["Load Current Set"].map(
+                        lambda value: f"Current = {value}"
+                    )
                     #combined_df2 = pd.concat([combined_df, upper_error_limitF_percent, lower_error_limitF_percent, conditionFF_percent, upper_error_limitF2_percent, lower_error_limitF2_percent, conditionFF2_percent], axis=1)
 
                     # Save the combined DataFrame to a CSV file
@@ -626,6 +643,12 @@ class datatoGraph(datatoCSV_Accuracy):
                         #Calculate Percentage Error
                         ProgrammingV_percent_error = (ProgrammingV_percent_error / upper_error_limit)
                         ReadbackV_percent_error    = (Vreadback_error / upper_error_limit)
+                        self.ProgrammingV_percent_error_list.append(
+                            ProgrammingV_percent_error
+                        )
+                        self.ReadbackV_percent_error_list.append(
+                            ReadbackV_percent_error
+                        )
 
                          # percentage limits (always ±100)
                         upper_erro_percent_limit = upper_error_limit/upper_error_limit
@@ -711,12 +734,12 @@ class datatoGraph(datatoCSV_Accuracy):
                         conditionC2 = pd.concat([conditionC2, condition_series2])
 
                         # Collect percentage results for CSV output
-                        upper_erro_percent_limitC = pd.concat([upper_erro_percent_limitC, upper_erro_percent_limitC])
-                        lower_erro_percent_limitC = pd.concat([lower_erro_percent_limitC, lower_erro_percent_limitC])
+                        upper_erro_percent_limitC = pd.concat([upper_erro_percent_limitC, upper_erro_percent_limit])
+                        lower_erro_percent_limitC = pd.concat([lower_erro_percent_limitC, lower_erro_percent_limit])
                         condition_percentC = pd.concat([condition_percentC, condition_series_percent])  
 
-                        upper_erro_percent_limitC2 = pd.concat([upper_erro_percent_limitC2, upper_erro_percent_limitC])
-                        lower_erro_percent_limitC2 = pd.concat([lower_erro_percent_limitC2, lower_erro_percent_limitC])
+                        upper_erro_percent_limitC2 = pd.concat([upper_erro_percent_limitC2, upper_erro_percent_limit2])
+                        lower_erro_percent_limitC2 = pd.concat([lower_erro_percent_limitC2, lower_erro_percent_limit2])
                         condition2_percentC = pd.concat([condition2_percentC, condition_series2_percent])
                     
             
@@ -776,10 +799,22 @@ class datatoGraph(datatoCSV_Accuracy):
 
                     # Drop the 'key' column from ungrouped_df
                     ungrouped_df.drop(columns=["key"], inplace=True)
+                    ungrouped_df["Relative/Voltage Percentage Error (%)"] = pd.concat(
+                        self.ProgrammingV_percent_error_list
+                    ).reset_index(drop=True)
+                    ungrouped_df["PSU Readback Voltage Percentage Error (%)"] = pd.concat(
+                        self.ReadbackV_percent_error_list
+                    ).reset_index(drop=True)
 
                     # Combine all DataFrames into a single DataFrame
                     combined_df = pd.concat([ungrouped_df, upper_error_limitF, lower_error_limitF, conditionFF, upper_error_limitF2, lower_error_limitF2, conditionFF2], axis=1)
                     combined_df2 = pd.concat([combined_df, upper_error_limitF_percent, lower_error_limitF_percent, conditionFF_percent, upper_error_limitF2_percent, lower_error_limitF2_percent, conditionFF2_percent], axis=1)
+                    for chart_frame in (combined_df, combined_df2):
+                        chart_frame["Chart Mode"] = "VOLTAGE_CURRENT_CHANGE"
+                        chart_frame["Chart X"] = chart_frame["Load Current Set"]
+                        chart_frame["Chart Group"] = chart_frame["PSU Voltage Set"].map(
+                            lambda value: f"Voltage = {value}"
+                        )
 
                     # Save the combined DataFrame to a CSV file
                     combined_df.to_csv(ERROR_CSV_PATH, index=False)
@@ -1023,6 +1058,11 @@ class datatoGraph2(datatoCSV_Accuracy2):
 
                     # Combine all DataFrames into a single DataFrame
                     combined_df = pd.concat([ungrouped_df, upper_error_limitF, lower_error_limitF, conditionFF, upper_error_limitF2, lower_error_limitF2, conditionFF2, upper_error_limitF_percent, lower_error_limitF_percent, conditionFF_percent, upper_error_limitF2_percent, lower_error_limitF2_percent, conditionFF2_percent], axis=1)
+                    combined_df["Chart Mode"] = "CURRENT"
+                    combined_df["Chart X"] = combined_df["PSU Current Set"]
+                    combined_df["Chart Group"] = combined_df["Load Voltage Set"].map(
+                        lambda value: f"Voltage = {value}"
+                    )
 
                     # Save the combined DataFrame to a CSV file
                     combined_df.to_csv(ERROR_CSV_PATH, index=False)

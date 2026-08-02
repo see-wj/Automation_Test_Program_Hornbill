@@ -180,6 +180,7 @@ class SimulatedVisaResource:
         raise_for_simulation_fault("query", self.resource_name, command)
         self.state.command_log.append((self.resource_name, command))
         normalized = command.upper()
+        canonical = normalized.lstrip(":")
 
         if normalized == "*IDN?":
             return self.identity + "\n"
@@ -187,7 +188,10 @@ class SimulatedVisaResource:
             return "1\n" if normalized == "*OPC?" else "0\n"
         if normalized.startswith("SYST:ERR"):
             return '0,"No error"\n'
-        if normalized.startswith("STAT:OPER:COND"):
+        if re.match(
+            r"STAT(?:US)?:OPER(?:ATION)?:COND(?:ITION)?\?",
+            canonical,
+        ):
             return "512\n"
         if normalized.startswith("DIAG:PEEK?"):
             selector = self._diagnostic_selector(command)
@@ -280,6 +284,7 @@ class SimulatedVisaResource:
 class SimulatedVisaResourceManager:
     def __init__(self, state=None):
         self.state = state or get_simulation_state()
+        self.visalib = "Simulated VISA backend"
         self.closed = False
 
     def list_resources(self, query="?*::INSTR"):
@@ -315,11 +320,12 @@ def create_resource_manager():
 
 def initialize_main_thread_visa():
     global _main_thread_resource_manager
-    if is_simulation_mode():
-        return None
     if threading.current_thread() is not threading.main_thread():
         raise RuntimeError("VISA must be initialized from the main thread")
     if _main_thread_resource_manager is None:
+        if is_simulation_mode():
+            _main_thread_resource_manager = SimulatedVisaResourceManager()
+            return _main_thread_resource_manager
         _main_thread_resource_manager = pyvisa.ResourceManager()
         _main_thread_resource_manager.list_resources()
     return _main_thread_resource_manager

@@ -51,7 +51,7 @@ def _commands_for_role(role, configuration):
             ("set_current_zero", "CURR 0"),
             ("disable_series_parallel", "OUTP:PAIR OFF"),
         )
-    if role == "ACSource":
+    if role in {"ACSource", "ExternalSource"}:
         return (("disable_output", "OUTP OFF"),)
     if role == "OSC":
         return (("stop_acquisition", "STOP"),)
@@ -79,10 +79,14 @@ def shutdown_instruments(configuration, resource_manager_factory=None):
         return ShutdownResult(tuple(attempted_roles), tuple(failures))
 
     try:
-        for role in ("ELoad", "PSU", "ACSource", "OSC"):
+        for role in ("ELoad", "PSU", "ExternalSource", "ACSource", "OSC"):
             address = configuration.get(role)
             commands = _commands_for_role(role, configuration)
-            if not address or not commands:
+            if (
+                not address
+                or str(address).strip().lower() == "none"
+                or not commands
+            ):
                 continue
 
             attempted_roles.append(role)

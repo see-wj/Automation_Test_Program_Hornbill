@@ -11,6 +11,10 @@ if str(SRC) not in sys.path:
 
 from instruments.TestVolt_HB_3458 import CalWorker, normalize_visa_address
 from instruments.TestVolt_HB_3458 import VoltageCalibrationDialog
+from instruments.TestVolt_HB_34470A import CalWorker as CalWorker34470A
+from instruments.TestVolt_HB_34470A import (
+    VoltageCalibrationDialog as VoltageCalibration34470ADialog,
+)
 
 
 class FakeInstrument:
@@ -120,6 +124,51 @@ class HornbillVoltageCalibrationTests(unittest.TestCase):
         self.assertEqual(psu_writes[-1], "OUTPUT:STATE OFF,(@1)")
         self.assertNotIn("CAL:SAVE", psu_writes)
 
+    def test_34470a_sequence_uses_modern_scpi_and_saves_both_points(self):
+        psu = FakeInstrument()
+        dmm = FakeInstrument(["1.23456789", "59.8765432"])
+        dmm_address = "USB0::0x2A8D::0x0501::MY57702180::0::INSTR"
+        resource_manager = FakeResourceManager({
+            "TCPIP0::PSU::inst0::INSTR": psu,
+            dmm_address: dmm,
+        })
+        worker = CalWorker34470A(
+            "TCPIP0::PSU::INSTR",
+            dmm_address,
+            "PP8000A",
+            1,
+            ["P1", "P2"],
+            resource_manager_factory=lambda: resource_manager,
+            command_delay=0,
+            settling_delay=0,
+        )
+        errors = []
+        worker.error.connect(errors.append)
+
+        worker.run()
+
+        self.assertEqual(errors, [])
+        dmm_writes = [
+            command
+            for operation, command in dmm.commands
+            if operation == "write"
+        ]
+        self.assertIn("*RST", dmm_writes)
+        self.assertIn("CONF:VOLT:DC 10", dmm_writes)
+        self.assertIn("SENS:VOLT:DC:NPLC 100", dmm_writes)
+        self.assertIn("SENS:VOLT:DC:RANG 10", dmm_writes)
+        self.assertIn("SENS:VOLT:DC:RANG 100", dmm_writes)
+        self.assertEqual(dmm.commands.count(("query", "READ?")), 2)
+        psu_writes = [
+            command
+            for operation, command in psu.commands
+            if operation == "write"
+        ]
+        self.assertIn("CAL:DATA 1.23456789", psu_writes)
+        self.assertIn("CAL:DATA 59.8765432", psu_writes)
+        self.assertIn("CAL:SAVE", psu_writes)
+        self.assertEqual(psu_writes[-1], "OUTPUT:STATE OFF,(@1)")
+
     def test_short_gpib_address_is_canonicalized(self):
         self.assertEqual(
             normalize_visa_address("GPIB0::22"),
@@ -163,6 +212,39 @@ class HornbillVoltageCalibrationTests(unittest.TestCase):
 
         self.assertEqual(registration.title, "Voltage Calibration - 3458A")
         self.assertIs(registration.factory, VoltageCalibrationDialog)
+
+    def test_gui_launcher_includes_34470a_calibration_dialog(self):
+        import GUI
+
+        registry = GUI.MainWindow._create_dialog_registry(object())
+        registration = next(
+            item
+            for item in registry.registrations
+            if item.owner_attribute == "voltage_calibration_34470a_dialog"
+        )
+
+        self.assertEqual(registration.title, "Voltage Calibration - 34470A")
+        self.assertIs(registration.factory, VoltageCalibration34470ADialog)
+
+    def test_test_selection_exposes_approved_hornbill_dialogs(self):
+        import GUI
+
+        registry = GUI.MainWindow._create_dialog_registry(object())
+        options = registry.indexed_selection_options(
+            GUI.MainWindow.TEST_SELECTION_DIALOGS
+        )
+
+        self.assertEqual(
+            [title for _index, title, _description in options],
+            [
+                "Voltage Calibration - 3458A",
+                "Voltage Calibration - 34470A",
+                "Hornbill Low Voltage Scope Capture",
+                "Hornbill Noise Test Voltage Sweep",
+                "DAQ973A Temperature Measurement",
+                "Waveform Image Anomaly Analyzer",
+            ],
+        )
 
 
 if __name__ == "__main__":

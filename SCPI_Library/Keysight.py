@@ -1027,6 +1027,17 @@ class Excavator(Subsystem):
     def setSYSTEMEMULationMode(self, mode):
         self.instr.write(f"SYSTem:EMULation {mode}")
 
+    def setPOSCurrentLimit(self, value):
+        self.instr.write(f"SOURce:CURRent:LIMit:POSitive {value}")
+
+    def setNEGCurrentLimit(self, value):
+        self.instr.write(f"SOURce:CURRent:LIMit:NEGative {value}")
+
+    def setOutputVoltage(self, value):
+        self.instr.write(f"SOURce:VOLTage {value}")
+
+    def setOutputState(self, state):
+        self.instr.write(f"OUTPut:STATe {state}")
 
 class Hornbill(Subsystem):
     """Child Class for Hornbill Subsystem"""
@@ -1035,6 +1046,10 @@ class Hornbill(Subsystem):
     READBACK_MODE_SCPI = "SCPI"
     DEFAULT_VOLTAGE_SAMPLE_COUNT = 100000
     MAX_VOLTAGE_SAMPLE_COUNT = 512000
+    DIAGNOSTIC_VOLTAGE_INPUTS = {
+        "VMON": 0,
+        "VLOC": 2,
+    }
     DIAGNOSTIC_CURRENT_INPUTS = {
         "200UA": 1,
         "200MA": 3,
@@ -1060,7 +1075,7 @@ class Hornbill(Subsystem):
         self.instr.write(f"SOURce:CURRent:LIMit:NEG:IMMediate:AMPLitude {Value}, (@{ChannelNumber})")
 
     def senseVoltageSource(self, Mode, ChannelNumber):
-        self.instr.write(f"SOURce:VOLTage:SENSe:SOURce {Mode}, (@{ChannelNumber})")
+        self.instr.write(f"SOURce:VOLTage:SENSe:SOURce {Mode},(@{ChannelNumber})")
                 
     def outputState(self, state, ChannelNumber):
         self.instr.write(f"OUTPut:STATe {state}, (@{ChannelNumber})")
@@ -1121,19 +1136,30 @@ class Hornbill(Subsystem):
         self,
         ChannelNumber,
         mode=READBACK_MODE_DIAG,
+        diagnostic_input="VMON",
         sample=DEFAULT_VOLTAGE_SAMPLE_COUNT,
     ):
         if self.normalizeReadbackMode(mode) == self.READBACK_MODE_SCPI:
             self.setVoltageSweepPoints(ChannelNumber, sample)
             response = self.measureVoltageDC(ChannelNumber)
         else:
+            input_name = str(diagnostic_input).replace("_", "").upper()
+            try:
+                selector = self.DIAGNOSTIC_VOLTAGE_INPUTS[input_name]
+            except KeyError as exception:
+                supported = ", ".join(self.DIAGNOSTIC_VOLTAGE_INPUTS)
+                raise ValueError(
+                    f"Unsupported Hornbill DIAG voltage input. Use: {supported}"
+                ) from exception
             sample_count = int(sample)
             if sample_count < 1 or sample_count > self.MAX_VOLTAGE_SAMPLE_COUNT:
                 raise ValueError(
                     "Voltage sample count must be between 1 and "
                     f"{self.MAX_VOLTAGE_SAMPLE_COUNT}"
                 )
-            response = self.instr.query(f"DIAG:PEEK? 20,0,{sample_count}")
+            response = self.instr.query(
+                f"DIAG:PEEK? 2{int(ChannelNumber) - 1},{selector},{sample_count}"
+            )
         return self._firstMeasurementValue(response)
 
     def measureReadbackCurrent(
@@ -1162,7 +1188,7 @@ class Hornbill(Subsystem):
                     f"{self.MAX_VOLTAGE_SAMPLE_COUNT}"
                 )
             response = self.instr.query(
-                f"DIAG:PEEK? 20,{selector},{sample_count}"
+                f"DIAG:PEEK? 2{int(ChannelNumber) - 1},{selector},{sample_count}"
             )
         return self._firstMeasurementValue(response)
     
@@ -1181,51 +1207,56 @@ class Hornbill(Subsystem):
     #   6 : IMON_2mA
     #   7 : IMON_FULL
 
+    def diag_POKE_LOW_VOLTAGE_CONTROL(self, ChannelNumber, value):
+        self.instr.write(f"DIAG:POKE 10{ChannelNumber},{value}")
+
     def diag_POKE_Apply_Calibration_Constant(self, ChannelNumber, value):
         self.instr.write(f"DIAG:POKE 23{ChannelNumber},{value}")
     
     def diag_POKE_SMR_200uA_2mA_20mA_200mA_AnalogSwitch_Control(self, ChannelNumber, state):
         self.instr.write(f"DIAG:POKE 20{ChannelNumber},{state}")
 
-    def diag_PEEK_VoltageReadback_VMON_100k(self):
-        resp = self.instr.query("DIAG:PEEK? 20,0,100000")
+    def diag_PEEK_VoltageReadback_VMON_100k(self, ChannelNumber):
+        resp = self.instr.query(f"DIAG:PEEK? 2{ChannelNumber-1},0,100000")
         return resp
     
-    def diag_PEEK_CurrentReadback_IMON_200uA_100k(self):
-        resp = self.instr.query("DIAG:PEEK? 20,1,100000")
+    def diag_PEEK_CurrentReadback_IMON_200uA_100k(self, ChannelNumber):
+        resp = self.instr.query(f"DIAG:PEEK? 2{ChannelNumber-1},1,100000")
         return resp
     
-    def diag_PEEK_VoltageReadback_VLOC_100k(self):
-        resp = self.instr.query("DIAG:PEEK? 20,2,100000")
+    def diag_PEEK_VoltageReadback_VLOC_100k(self, ChannelNumber):
+        resp = self.instr.query(f"DIAG:PEEK? 2{ChannelNumber-1},2,100000")
         return resp
     
-    def diag_PEEK_CurrentReadback_IMON_200mA_100k(self):
-        resp = self.instr.query("DIAG:PEEK? 20,3,100000")
+    def diag_PEEK_CurrentReadback_IMON_200mA_100k(self, ChannelNumber):
+        resp = self.instr.query(f"DIAG:PEEK? 2{ChannelNumber-1},3,100000")
         return resp
     
-    def diag_PEEK_CurrentReadback_IMON_20mA_100k(self):
-        resp = self.instr.query("DIAG:PEEK? 20,4,100000")
+    def diag_PEEK_CurrentReadback_IMON_20mA_100k(self, ChannelNumber):
+        resp = self.instr.query(f"DIAG:PEEK? 2{ChannelNumber-1},4,100000")
         return resp
     
-    def diag_PEEK_CurrentReadback_IMON_2A_100k(self):
-        resp = self.instr.query("DIAG:PEEK? 20,5,100000")
+    def diag_PEEK_CurrentReadback_IMON_2A_100k(self, ChannelNumber):
+        resp = self.instr.query(f"DIAG:PEEK? 2{ChannelNumber-1},5,100000")
         return resp
     
-    def diag_PEEK_CurrentReadback_IMON_2mA_100k(self):
-        resp = self.instr.query("DIAG:PEEK? 20,6,100000")
-        return resp
-    
-    def diag_PEEK_CurrentReadback_IMON_FULL_100k(self):
-        resp = self.instr.query("DIAG:PEEK? 20,7,100000")
+    def diag_PEEK_CurrentReadback_IMON_2mA_100k(self, ChannelNumber):
+        resp = self.instr.query(f"DIAG:PEEK? 2{ChannelNumber-1},6,100000")
         return resp
 
-    def diagVoltageReadback_VMON_100k(self):
-        return self.diag_PEEK_VoltageReadback_VMON_100k().encode("ascii")
+    def diag_PEEK_CurrentReadback_IMON_FULL_100k(self, ChannelNumber):
+        resp = self.instr.query(f"DIAG:PEEK? 2{ChannelNumber-1},7,100000")
+        return resp
 
-    def diagCurrentReadback_IMON_FULL_100k(self):
-        return self.diag_PEEK_CurrentReadback_IMON_FULL_100k().encode("ascii")
+    def diagVoltageReadback_VMON_100k(self, ChannelNumber):
+        return self.diag_PEEK_VoltageReadback_VMON_100k(ChannelNumber).encode("ascii")
+
+    def diagVoltageReadback_VLOC_100k(self, ChannelNumber):
+        return self.diag_PEEK_VoltageReadback_VLOC_100k(ChannelNumber).encode("ascii")
+
+    def diagCurrentReadback_IMON_FULL_100k(self, ChannelNumber):
+        return self.diag_PEEK_CurrentReadback_IMON_FULL_100k(ChannelNumber).encode("ascii")
     
-
 class SMU_N67XX(Subsystem):
     
     def __init__(self,VISA_ADDRESS):
@@ -1239,7 +1270,6 @@ class SMU_N67XX(Subsystem):
 
     def setRange (self, Mode, Value):
         self.instr.write(f"SOURce:{Mode}:RANGe {Value}")
-
 
 class Oscilloscope(Subsystem):
     """Child Class for Oscilloscope Subsystem"""
@@ -1395,7 +1425,6 @@ class Oscilloscope(Subsystem):
     def setMarkerXY_Source(self, ChannelNumber):
         self.instr.write(f":MARK:X1Y1  {ChannelNumber}")
 
-
 class DMM_3458A(Subsystem):
     """Child Class for 3458A Subsystem"""
 
@@ -1445,13 +1474,15 @@ class DMM_3458A(Subsystem):
     
     def enableAutoZero(self):
         self.instr.write(f"AZERO ON")
+
+    def setAutoZeroMode(self, state):
+        self.instr.write(f"AZERO {state}")
     
     def enableDisplay(self):
         self.instr.write(f"DISP ON")
 
     def queryMeasurement(self):
         return self.instr.query("TARM SGL,1")
-
 
 class DAQ973A(Subsystem):
     """SCPI commands for DAQ973A thermocouple temperature measurements."""
@@ -1509,7 +1540,6 @@ class DAQ973A(Subsystem):
     def queryError(self):
         return self.instr.query("SYST:ERR?")
 
-
 class DMM_344XXA(Subsystem):
     """Child Class for 344xxA Subsystem"""
 
@@ -1539,9 +1569,10 @@ class DMM_344XXA(Subsystem):
         
     
     def setAutoZeroMode(self, mode):
-        self.instr.write(f"{mode} AUTO")
+        self.instr.write(f"SENSe:VOLTage:DC:ZERO:AUTO {mode}")
+
     def setAutoImpedanceMode(self, mode):
-        self.instr.write(f"{mode} IMP:AUTO {mode}")
+        self.instr.write(f"SENSe:VOLTage:DC:IMPedance:AUTO {mode}")
 
 class ELOAD_E367XXA(Subsystem):
     """Child Class for ELOAD_E367XXA Subsystem"""
@@ -1560,9 +1591,67 @@ class ELOAD_E367XXA(Subsystem):
         else:
             command_value = "MIN" if numeric_value == 0 else value
         self.instr.write(f"CURR {command_value}")
+
+    def setOutputVoltage(self, value):
+        try:
+            numeric_value = float(value)
+        except (TypeError, ValueError):
+            command_value = value
+        else:
+            command_value = "MIN" if numeric_value == 0 else value
+        self.instr.write(f"VOLT {command_value}")
     
     def setOutputState(self, state):
         self.instr.write(f"OUTP {state}")
 
+    def setEmulationMode(self, mode):
+        self.instr.write(f":SOURce:EMULation {mode}")
 
+    def setFunction(self, mode):
+        self.instr.write(f":FUNCtion {mode}")
+
+    def setSlewRatePOS(self, value):
+        self.instr.write(f":SOURce:VOLTage:SLEW:POSitive:IMMediate {value}")
+
+    def setSlewRateNEG(self, value):
+        self.instr.write(f":SOURce:VOLTage:SLEW:NEGative:IMMediate {value}")
+
+    def setSlewRising(self, value):
+        self.instr.write(f":SOURce:VOLTage:SLEW:RISing:IMMediate {value}")
+
+    def setSlewFalling(self, value):
+        self.instr.write(f":SOURce:VOLTage:SLEW:FALLing:IMMediate {value}")
+
+class ELOAD_E363XXA(Subsystem):
+    """Child Class for ELOAD_E363XXA Subsystem"""
+
+    def __init__(self, VISA_ADDRESS):
+        super().__init__(VISA_ADDRESS)
+
+    def setMode(self, mode, ChannelNumber):
+        self.instr.write(f"FUNC {mode},(@{ChannelNumber})")
+    
+    def setOutputCurrent(self, value, ChannelNumber):
+        try:
+            numeric_value = float(value)
+        except (TypeError, ValueError):
+            command_value = value
+        else:
+            command_value = "MIN" if numeric_value == 0 else value
+        self.instr.write(f"CURR {command_value},(@{ChannelNumber})")
+
+    def setOutputVoltage(self, value, ChannelNumber):
+        try:
+            numeric_value = float(value)
+        except (TypeError, ValueError):
+            command_value = value
+        else:
+            command_value = "MIN" if numeric_value == 0 else value
+        self.instr.write(f"VOLT {command_value},(@{ChannelNumber})")
+
+    def setOutputState(self, state, ChannelNumber):
+        self.instr.write(f"OUTP {state},(@{ChannelNumber})")
+
+    def setFunction(self, mode, ChannelNumber):
+        self.instr.write(f":FUNCtion {mode},(@{ChannelNumber})")
 SMU = SMU_N67XX

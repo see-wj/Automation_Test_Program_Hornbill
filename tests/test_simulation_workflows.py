@@ -1,11 +1,13 @@
 import os
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import GUI
 from DUT_Test_Scripts.Dolphin import DUT_Test as dut_measurements
 from DUT_Test_Scripts.Hornbill import Hornbill_DUT_Test_With_ELoad as hornbill_measurements
+from DUT_Test_Scripts.Hornbill import Hornbill_DUT_Test_No_ELoad as hornbill_no_load
 from SCPI_Library.session_manager import (
     begin_visa_session_scope,
     close_visa_session_scope,
@@ -14,6 +16,7 @@ from SCPI_Library.session_manager import get_visa_resource
 from SCPI_Library.simulation import get_simulation_state, reset_simulation
 from SCPI_Library.simulation import inject_simulation_fault
 from SCPI_Library.instrument_errors import CleanupError, ReportGenerationError
+from SCPI_Library.Keysight import Oscilloscope
 
 
 class Parameters(dict):
@@ -111,7 +114,88 @@ class SimulationWorkflowTests(unittest.TestCase):
 
         self.assertEqual(info, [[5.0, 1.0, 0]])
         self.assertEqual(measured, [[5.0, 0]])
-        self.assertEqual(readback, [[5.0, 0.9]])
+        self.assertEqual(readback, [[5.0, 0.9, 5.0]])
+
+    def test_real_hornbill_voltage_accuracy_without_eload(self):
+        configuration = self._measurement_configuration()
+        configuration["ELoad"] = "None"
+
+        with patch.dict(
+            os.environ, {"AUTOMATION_SIMULATION": "1"}, clear=False
+        ), patch.object(hornbill_no_load, "sleep", lambda *_: None):
+            begin_visa_session_scope()
+            info, measured, readback = (
+                hornbill_no_load.HornbillVoltageMeasurementNoELoad().Execute_Voltage_Accuracy_Current_Static(
+                    configuration, 1
+                )
+            )
+
+        self.assertEqual(info, [[5.0, 0.0, 0]])
+        self.assertEqual(measured, [[5.0, 0]])
+        self.assertEqual(readback, [[5.0, 0.0, 5.0]])
+        self.assertFalse(
+            any(
+                address == "None"
+                for address, _command in get_simulation_state().command_log
+            )
+        )
+
+    def test_production_executor_runs_hornbill_without_eload(self):
+        configuration = self._measurement_configuration()
+        configuration["ELoad"] = "None"
+        worker = GUI.TestWorker(
+            {
+                "VoltageAccuracy": True,
+                "CurrentStatic(VoltageChange)": True,
+                "DataReport": False,
+            },
+            configuration,
+            Parameters(DUT="Hornbill", noofloop=1, PSU_Channel=[1]),
+        )
+
+        with patch.dict(
+            os.environ, {"AUTOMATION_SIMULATION": "1"}, clear=False
+        ), patch.object(hornbill_no_load, "sleep", lambda *_: None):
+            begin_visa_session_scope()
+            worker._run_hornbill_voltage_accuracy(0)
+
+        self.assertEqual(worker.infoList, [[5.0, 0.0, 0]])
+        self.assertEqual(worker.dataList, [[5.0, 0]])
+        self.assertEqual(worker.dataList2, [[5.0, 0.0, 5.0]])
+
+    def test_hornbill_no_eload_scope_mode_saves_screenshot(self):
+        configuration = self._measurement_configuration()
+        configuration.update(
+            ELoad="None",
+            OSC="USB0::SIM::SCOPE::INSTR",
+        )
+        png_data = b"\x89PNG\r\nSIMULATED"
+
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ, {"AUTOMATION_SIMULATION": "1"}, clear=False
+        ), patch.object(
+            hornbill_no_load, "sleep", lambda *_: None
+        ), patch.object(
+            Oscilloscope, "read_binary_data", return_value=png_data
+        ):
+            configuration["savedir"] = directory
+            begin_visa_session_scope()
+            info, measured, readback = (
+                hornbill_no_load.HornbillVoltageMeasurementNoELoadWithOscilloscope().Execute_Voltage_Accuracy_Current_Static(
+                    configuration, 1
+                )
+            )
+            screenshots = list(Path(directory).glob("*.png"))
+            screenshot_data = screenshots[0].read_bytes()
+
+        self.assertEqual(info, [[5.0, 0.0, 0]])
+        self.assertEqual(measured, [[5.0, 0]])
+        self.assertEqual(readback, [[5.0, 0.0, 5.0]])
+        self.assertEqual(len(screenshots), 1)
+        self.assertEqual(screenshot_data, png_data)
+        commands = [command for _, command in get_simulation_state().command_log]
+        self.assertIn(":RUN; *WAI", commands)
+        self.assertIn(":STOP; *WAI", commands)
 
     def test_hornbill_voltage_accuracy_respects_zero_initial_current(self):
         configuration = self._measurement_configuration()
@@ -169,10 +253,10 @@ class SimulationWorkflowTests(unittest.TestCase):
         commands = [command for _, command in get_simulation_state().command_log]
         self.assertEqual(info, [[5.0, 1.0, 0]])
         self.assertEqual(measured, [[5.0, 0]])
-        self.assertEqual(readback, [[5.0, 0.9]])
+        self.assertEqual(readback, [[5.0, 0.9, 5.0]])
         self.assertIn("MEAS:VOLT:DC? (@1)", commands)
         self.assertIn("MEASure:CURRent:DC? (@1)", commands)
-        self.assertFalse(any(command.startswith("DIAG:PEEK?") for command in commands))
+        self.assertIn("DIAG:PEEK? 20,2,100000", commands)
 
     def test_real_hornbill_current_accuracy_measurement(self):
         configuration = self._measurement_configuration()
@@ -190,7 +274,7 @@ class SimulationWorkflowTests(unittest.TestCase):
 
         self.assertEqual(info, [[5.0, 2.0, 0]])
         self.assertEqual(measured, [[0, 2.0]])
-        self.assertEqual(readback, [[0.0, 2.0]])
+        self.assertEqual(readback, [[0.0, 2.0, 0.0]])
 
     def _run_workflow(self, dut, mode):
         voltage_mode = mode == "voltage"

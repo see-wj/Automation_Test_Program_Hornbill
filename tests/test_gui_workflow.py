@@ -1,9 +1,13 @@
 import json
 import sys
 import tempfile
+import threading
+import time
 import unittest
+from datetime import datetime, timedelta
 from io import BytesIO, TextIOWrapper
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -12,6 +16,7 @@ for import_path in (SRC, ROOT):
     if str(import_path) not in sys.path:
         sys.path.insert(0, str(import_path))
 
+from PyQt5.QtCore import QPointF
 from PyQt5.QtWidgets import QApplication, QMessageBox
 
 import GUI
@@ -51,6 +56,7 @@ class DummyWorker:
             "error",
             "warning",
             "new_data",
+            "temperature_data",
             "popup_data",
             "state_changed",
         ):
@@ -122,11 +128,23 @@ class GuiWorkflowTests(unittest.TestCase):
         self.dialog.QCheckBox_Image_Widget.setChecked(False)
 
     def tearDown(self):
+        self.wait_for_instrument_discovery()
         self.dialog.worker = None
         self.dialog.close()
         self.dialog.deleteLater()
         self.application.processEvents()
         self.queue_directory.cleanup()
+
+    def wait_for_instrument_discovery(self, timeout=2.0):
+        deadline = time.monotonic() + timeout
+        while (
+            self.dialog.instrument_discovery_thread is not None
+            and time.monotonic() < deadline
+        ):
+            self.application.processEvents()
+            time.sleep(0.01)
+        self.application.processEvents()
+        self.assertIsNone(self.dialog.instrument_discovery_thread)
 
     def test_console_output_replaces_unsupported_windows_characters(self):
         raw_stream = BytesIO()
@@ -141,8 +159,36 @@ class GuiWorkflowTests(unittest.TestCase):
         )
 
     def test_ui_builders_assemble_expected_sections(self):
-        self.assertEqual(self.dialog.layout().count(), 1)
+        self.assertEqual(self.dialog.layout().count(), 2)
+        self.assertEqual(self.dialog.windowTitle(), "Bundle Test Control Center")
+        self.assertEqual(self.dialog.dialog_tabs.objectName(), "bundleTabs")
+        self.assertFalse(self.dialog.dialog_tabs.tabBar().expanding())
+        self.assertEqual(
+            self.dialog.Connection_group.title(),
+            "Instrument Connections",
+        )
+        self.assertLessEqual(self.dialog.image_label.maximumWidth(), 360)
+        self.assertLessEqual(self.dialog.image_label.maximumHeight(), 210)
+        self.assertEqual(
+            [
+                self.dialog.dialog_tabs.tabText(index)
+                for index in range(self.dialog.dialog_tabs.count())
+            ],
+            [
+                "Test Setup",
+                "Graph Plotting",
+                "Temperature Plotting",
+                "Webcam",
+                "Data Analysis",
+            ],
+        )
+        self.assertFalse(self.dialog.webcam_widget.preview_active)
         self.assertIsNotNone(self.dialog.Connection_group.layout())
+        self.assertFalse(hasattr(self.dialog, "QPushButton_Widget2"))
+        self.assertEqual(
+            self.dialog.DMM_Settings_group.title(),
+            "DMM Measurement Settings",
+        )
         self.assertEqual(
             self.dialog.Auxiliary_group.title(),
             "Auxiliary Equipment",
@@ -160,9 +206,63 @@ class GuiWorkflowTests(unittest.TestCase):
                 "Both Relays",
             ],
         )
-        self.assertEqual(self.dialog.dialog_tabs.count(), 2)
+        self.assertEqual(self.dialog.dialog_tabs.count(), 5)
         self.assertEqual(self.dialog.dialog_tabs.tabText(0), "Test Setup")
         self.assertEqual(self.dialog.dialog_tabs.tabText(1), "Graph Plotting")
+        self.assertEqual(
+            self.dialog.dialog_tabs.tabText(2),
+            "Temperature Plotting",
+        )
+        self.assertEqual(self.dialog.dialog_tabs.tabText(3), "Webcam")
+        self.assertEqual(self.dialog.dialog_tabs.tabText(4), "Data Analysis")
+
+    def test_inline_dmm_settings_follow_selected_model(self):
+        model_index = self.dialog.QComboBox_DMM_Model.findData("344xxA")
+        self.dialog.QComboBox_DMM_Model.setCurrentIndex(model_index)
+        self.dialog.QComboBox_344XXA_Range.setCurrentText("10V")
+        self.dialog.QComboBox_344XXA_NPLC.setCurrentText("10")
+        self.dialog.QComboBox_344XXA_AutoZero.setCurrentText("OFF")
+        self.dialog.QComboBox_344XXA_InputZ.setCurrentIndex(0)
+
+        self.assertEqual(self.dialog.params.DMM_Model, "344xxA")
+        self.assertEqual(self.dialog.params.Range, "10V")
+        self.assertEqual(self.dialog.params.Aperture, "10")
+        self.assertEqual(self.dialog.params.AutoZero, "OFF")
+        self.assertEqual(self.dialog.params.inputZ, "ON")
+        self.assertFalse(self.dialog.DMM_344XXA_Settings_group.isHidden())
+        self.assertTrue(self.dialog.DMM_3458A_Settings_group.isHidden())
+
+        model_index = self.dialog.QComboBox_DMM_Model.findData("3458A")
+        self.dialog.QComboBox_DMM_Model.setCurrentIndex(model_index)
+        self.dialog.QComboBox_3458A_Range.setCurrentIndex(3)
+        self.dialog.QComboBox_3458A_NPLC.setCurrentText("100")
+        self.dialog.QComboBox_3458A_AutoZero.setCurrentText("ON")
+
+        self.assertEqual(self.dialog.params.DMM_Model, "3458A")
+        self.assertEqual(self.dialog.params.Range, "10")
+        self.assertEqual(self.dialog.params.Aperture, "100")
+        self.assertEqual(self.dialog.params.AutoZero, "ON")
+        self.assertTrue(self.dialog.DMM_344XXA_Settings_group.isHidden())
+        self.assertFalse(self.dialog.DMM_3458A_Settings_group.isHidden())
+
+    def test_sinking_voltage_settings_are_only_shown_for_sinking_mode(self):
+        self.assertTrue(self.dialog.Sinking_Test_group.isHidden())
+
+        self.dialog.QCheckBox_Sinking_Test_Widget.setChecked(True)
+        self.dialog.QLineEdit_Sinking_Initial_Voltage.setText("10")
+        self.dialog.QLineEdit_Sinking_Initial_Voltage.textEdited.emit("10")
+        self.dialog.QLineEdit_Sinking_Final_Voltage.setText("20")
+        self.dialog.QLineEdit_Sinking_Final_Voltage.textEdited.emit("20")
+        self.dialog.QLineEdit_Sinking_Voltage_Step_Size.setText("2.5")
+        self.dialog.QLineEdit_Sinking_Voltage_Step_Size.textEdited.emit("2.5")
+
+        self.assertFalse(self.dialog.Sinking_Test_group.isHidden())
+        self.assertEqual(self.dialog.params.Sinking_Initial_Voltage, "10")
+        self.assertEqual(self.dialog.params.Sinking_Final_Voltage, "20")
+        self.assertEqual(self.dialog.params.Sinking_Voltage_Step_Size, "2.5")
+
+        self.dialog.QCheckBox_Voltage_Accuracy_Voltage_Mode_Widget.setChecked(True)
+        self.assertTrue(self.dialog.Sinking_Test_group.isHidden())
 
     def test_graph_button_opens_graph_plotting_subtab(self):
         self.dialog.dialog_tabs.setCurrentIndex(0)
@@ -192,6 +292,88 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(self.dialog.plot_window.prog_data, [0.1])
         self.assertFalse(self.dialog.plot_window.isWindow())
 
+    def test_temperature_samples_update_dedicated_plotting_subtab(self):
+        plot_widget = self.dialog.temperature_plot_widget
+        started = datetime(2026, 1, 1, 12, 0, 0)
+        plot_widget.reset(enabled=True)
+
+        plot_widget.add_sample(
+            SimpleNamespace(
+                timestamp=started,
+                readings={101: 20.0, 103: 21.0},
+            ),
+            0,
+        )
+        plot_widget.add_sample(
+            SimpleNamespace(
+                timestamp=started + timedelta(seconds=5),
+                readings={101: 20.5, 103: 21.5},
+            ),
+            1,
+        )
+
+        self.assertEqual(plot_widget.elapsed_seconds, [0.0, 5.0])
+        self.assertEqual(plot_widget.channel_data[101], [20.0, 20.5])
+        self.assertEqual(plot_widget.channel_data[103], [21.0, 21.5])
+        self.assertEqual(set(plot_widget.channel_curves), {101, 103})
+        self.assertIn("Loop 2", plot_widget.status_label.text())
+        self.assertIn("CH101: 20.500 °C", plot_widget.status_label.text())
+
+        plot_widget.update_test_state("COMPLETED")
+
+        self.assertTrue(plot_widget.status_label.text().startswith("COMPLETED |"))
+
+    def test_worker_temperature_signal_updates_plotting_tab(self):
+        worker = DummyWorker()
+        self.dialog._connect_worker(worker)
+        sample = SimpleNamespace(
+            timestamp=datetime(2026, 1, 1, 12, 0, 0),
+            readings={101: 23.5},
+        )
+
+        worker.temperature_data.emit(sample, 0)
+
+        self.assertEqual(
+            self.dialog.temperature_plot_widget.channel_data[101],
+            [23.5],
+        )
+
+    def test_graph_hover_shows_values_for_nearest_point(self):
+        plot_window = self.dialog.plot_window
+        plot_window.popup_plot(
+            0.1,
+            0.2,
+            0.5,
+            -0.5,
+            0.5,
+            -0.5,
+            1.0,
+            2.0,
+            100.0,
+            -100.0,
+        )
+        self.dialog.show()
+        self.dialog.dialog_tabs.setCurrentWidget(plot_window)
+        self.application.processEvents()
+
+        plot, series, label, vertical_line, horizontal_line = (
+            plot_window._hover_controls[0]
+        )
+        scene_position = plot.plotItem.vb.mapViewToScene(QPointF(0.0, 0.1))
+        plot_window._update_hover(
+            (scene_position,),
+            plot,
+            series,
+            label,
+            vertical_line,
+            horizontal_line,
+        )
+
+        self.assertTrue(label.isVisible())
+        self.assertIn("Programming Error: 0.1", label.toPlainText())
+        self.assertTrue(vertical_line.isVisible())
+        self.assertTrue(horizontal_line.isVisible())
+
     def test_temperature_checkbox_reveals_optional_daq_address(self):
         self.assertTrue(self.dialog.QLineEdit_DAQ_VisaAddress.isHidden())
 
@@ -200,6 +382,113 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertFalse(self.dialog.QLineEdit_DAQ_VisaAddress.isHidden())
         self.assertFalse(self.dialog.QLabel_DAQ_VisaAddress.isHidden())
 
+    def test_blynk_monitoring_is_optional_and_reports_missing_token(self):
+        self.assertFalse(self.dialog.QCheckBox_Blynk_Widget.isChecked())
+        self.assertEqual(self.dialog.Blynk_Status_Label.text(), "Blynk: Disabled")
+
+        self.dialog.QCheckBox_Blynk_Widget.setChecked(True)
+
+        if not self.dialog.blynk_publisher.configured:
+            self.assertIn(
+                "BLYNK_AUTH_TOKEN",
+                self.dialog.Blynk_Status_Label.text(),
+            )
+
+    def test_blynk_measurement_uses_documented_virtual_pins(self):
+        published = []
+        self.dialog.blynk_active = True
+        self.dialog.blynk_publisher = SimpleNamespace(
+            publish=lambda values, force=False: published.append(
+                (dict(values), force)
+            ),
+            stop=lambda: None,
+        )
+        measurement = all_test_dialog.RealtimeMeasurement(
+            set_voltage=5.0,
+            set_current=1.0,
+            programming_voltage=4.999,
+            readback_voltage=4.998,
+            readback_current=1.001,
+            programming_error=-0.001,
+            readback_error=-0.002,
+            programming_percent=-0.2,
+            readback_percent=-0.4,
+            programming_upper_bound=0.5,
+            programming_lower_bound=-0.5,
+            readback_upper_bound=0.5,
+            readback_lower_bound=-0.5,
+            percentage_upper_bound=100.0,
+            percentage_lower_bound=-100.0,
+        )
+
+        self.dialog._publish_blynk_measurement(measurement)
+
+        self.assertEqual(
+            set(published[0][0]),
+            {"v0", "v1", "v2", "v3", "v4", "v5", "v6", "v8"},
+        )
+
+    def test_blynk_temperature_uses_documented_channel_pins(self):
+        published = []
+        self.dialog.blynk_active = True
+        self.dialog.blynk_publisher = SimpleNamespace(
+            publish=lambda values, force=False: published.append(
+                (dict(values), force)
+            ),
+            stop=lambda: None,
+        )
+        sample = SimpleNamespace(
+            timestamp=datetime(2026, 1, 1, 12, 0, 0),
+            readings={101: 20.1, 103: 20.3, 104: 20.4, 105: 20.5},
+        )
+
+        self.dialog._handle_temperature_sample(sample, 0)
+
+        self.assertEqual(
+            published[0][0],
+            {"v10": 20.1, "v11": 20.3, "v12": 20.4, "v16": 20.5},
+        )
+
+    def test_blynk_run_metadata_publishes_collection_count_and_channel(self):
+        published = []
+        self.dialog.blynk_active = True
+        self.dialog.blynk_publisher = SimpleNamespace(
+            publish=lambda values, force=False: published.append(
+                (dict(values), force)
+            ),
+            stop=lambda: None,
+        )
+
+        self.dialog._publish_blynk_run_metadata(
+            {"noofloop": "3", "PSU_Channel": "2"}
+        )
+
+        self.assertEqual(published, [({"v13": 3, "v14": "2"}, True)])
+
+    def test_blynk_start_notification_includes_run_metadata(self):
+        notifications = []
+        self.dialog.blynk_active = True
+        self.dialog.blynk_publisher = SimpleNamespace(
+            notify_start=notifications.append,
+            stop=lambda: None,
+        )
+
+        self.dialog._notify_blynk_start(
+            {
+                "DUT": "Hornbill",
+                "PSU_Channel": "2",
+                "noofloop": "3",
+            }
+        )
+
+        self.assertEqual(
+            notifications,
+            [
+                "Test started: DUT=Hornbill, channel=2, "
+                "data collections=3."
+            ],
+        )
+
     def test_hornbill_configuration_loads_default_daq_address(self):
         self.dialog.QComboBox_DUT.setCurrentText("Hornbill")
 
@@ -207,6 +496,38 @@ class GuiWorkflowTests(unittest.TestCase):
             self.dialog.QLineEdit_DAQ_VisaAddress.currentText(),
             "USB0::0x2A8D::0x8601::MY59010677::0::INSTR",
         )
+
+    def test_hornbill_sinking_selection_shows_external_source_settings(self):
+        self.dialog.QComboBox_DUT.setCurrentText("Hornbill")
+        self.dialog.QCheckBox_VoltageLoadRegulation_Widget.setChecked(True)
+        self.dialog.QCheckBox_CurrentAccuracy_Widget.setChecked(True)
+
+        self.assertFalse(self.dialog.QCheckBox_Sinking_Test_Widget.isHidden())
+        self.dialog.QCheckBox_Sinking_Test_Widget.setChecked(True)
+
+        self.assertFalse(self.dialog.Sinking_Test_group.isHidden())
+        self.assertFalse(
+            self.dialog.QCheckBox_Voltage_Accuracy_Voltage_Mode_Widget.isChecked()
+        )
+        self.assertFalse(
+            self.dialog.QCheckBox_Voltage_Accuracy_Current_Mode_Widget.isChecked()
+        )
+        self.assertFalse(
+            self.dialog.QCheckBox_Voltage_Accuracy_Voltage_Mode_Oscilloscope_Widget.isChecked()
+        )
+        self.assertFalse(
+            self.dialog.QCheckBox_VoltageLoadRegulation_Widget.isChecked()
+        )
+        self.assertFalse(self.dialog.QCheckBox_CurrentAccuracy_Widget.isChecked())
+        self.assertEqual(
+            self.dialog.QLineEdit_External_Source_Positive_Current_Limit.text(),
+            "7",
+        )
+        self.assertEqual(
+            self.dialog.QLineEdit_External_Source_Negative_Current_Limit.text(),
+            "-7",
+        )
+        self.assertEqual(self.dialog.QLineEdit_Sink_Slew_Rate.text(), "10")
 
     def test_ocp_level_updates_parameters_and_output(self):
         self.dialog.OCP_Level_changed("2.5")
@@ -247,7 +568,25 @@ class GuiWorkflowTests(unittest.TestCase):
 
         self.assertEqual(self.dialog.realtime_plot_series.counter, 1)
         self.assertEqual(len(context.realtime_rows[0]), 15)
+        self.assertEqual(context.realtime_rows[0][7], 20.0)
+        self.assertEqual(context.realtime_rows[0][8], 10.0)
+        self.assertEqual(self.dialog.plot_window.prog_perc_data, [20.0])
+        self.assertEqual(self.dialog.plot_window.rb_perc_data, [10.0])
         self.assertIn("Pass", self.dialog.OutputBox.toPlainText())
+        self.assertIn("PASS", self.dialog.plot_window.status_label.text())
+        self.assertIn("Point 1", self.dialog.plot_window.status_label.text())
+        self.assertIn("Set 5 V, 1 A", self.dialog.plot_window.status_label.text())
+
+    def test_realtime_plots_show_named_legends(self):
+        legends = (
+            self.dialog.plot_window.prog_plot.plotItem.legend,
+            self.dialog.plot_window.rb_plot.plotItem.legend,
+            self.dialog.plot_window.prog_perc_plot.plotItem.legend,
+            self.dialog.plot_window.rb_perc_plot.plotItem.legend,
+        )
+
+        self.assertTrue(all(legend is not None for legend in legends))
+        self.assertTrue(all(len(legend.items) == 3 for legend in legends))
 
     def test_dut_selection_loads_configuration_into_bound_widgets(self):
         self.dialog.params.savelocation = "preserved-output"
@@ -270,11 +609,13 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(self.dialog.QComboBox_Voltage_Sense.currentText(), "4 Wire")
         self.assertEqual(
             self.dialog.QComboBox_Hornbill_Measurement_Command.currentText(),
-            "DIAG",
+            "SCPI",
         )
+        self.assertEqual(self.dialog.QLineEdit_SweepPoints.text(), "100000")
         self.assertFalse(
             self.dialog.QComboBox_Hornbill_Measurement_Command.isHidden()
         )
+        self.assertFalse(self.dialog.QLineEdit_SweepPoints.isHidden())
         self.assertEqual(self.dialog.QLineEdit_OVP_Level.text(), "")
 
     def test_hornbill_readback_command_can_be_switched_to_scpi(self):
@@ -285,11 +626,17 @@ class GuiWorkflowTests(unittest.TestCase):
             self.dialog.params.Hornbill_Measurement_Command,
             "SCPI",
         )
+        self.dialog.QComboBox_Hornbill_Measurement_Command.setCurrentText("DIAG")
+        self.dialog.QLineEdit_SweepPoints.setText("250")
+        self.dialog.QLineEdit_SweepPoints.textEdited.emit("250")
+
+        self.assertEqual(self.dialog.params.SweepPoints, "250")
 
         self.dialog.QComboBox_DUT.setCurrentText("Dolphin")
         self.assertTrue(
             self.dialog.QComboBox_Hornbill_Measurement_Command.isHidden()
         )
+        self.assertTrue(self.dialog.QLineEdit_SweepPoints.isHidden())
 
     def test_measurement_mode_updates_related_controls(self):
         self.dialog.QPushButton_Current_Widget.click()
@@ -397,9 +744,10 @@ class GuiWorkflowTests(unittest.TestCase):
         )
 
         with patch.object(
-            all_test_dialog, "ScanSelectedVisaResources", return_value=result
+            all_test_dialog, "GetConfiguredVisaResources", return_value=result
         ):
             self.dialog.QPushButton_Widget4.click()
+            self.wait_for_instrument_discovery()
 
         widgets = (
             self.dialog.QLineEdit_PSU_VisaAddress,
@@ -408,9 +756,13 @@ class GuiWorkflowTests(unittest.TestCase):
             self.dialog.QLineEdit_OSC_VisaAddress,
             self.dialog.QLineEdit_ELoad_VisaAddress,
             self.dialog.QLineEdit_DAQ_VisaAddress,
+            self.dialog.QLineEdit_External_Source_VisaAddress,
         )
         for widget in widgets:
-            self.assertEqual(widget.count(), 2)
+            expected_count = (
+                3 if widget is self.dialog.QLineEdit_ELoad_VisaAddress else 2
+            )
+            self.assertEqual(widget.count(), expected_count)
         self.assertEqual(
             self.dialog.QLineEdit_PSU_VisaAddress.currentText(),
             "USB0::PSU::INSTR",
@@ -418,6 +770,45 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(
             self.dialog.QLineEdit_DMM_VisaAddressforVoltage.currentText(),
             "USB0::DMM::INSTR",
+        )
+        self.assertEqual(
+            self.dialog.QLineEdit_ELoad_VisaAddress.currentText(),
+            "None",
+        )
+
+    def test_find_instruments_does_not_block_the_gui_thread(self):
+        scan_started = threading.Event()
+        release_scan = threading.Event()
+
+        def blocking_scan(*_args, **_kwargs):
+            scan_started.set()
+            release_scan.wait(1.0)
+            return GUI.DiscoveryResult()
+
+        with patch.object(
+            all_test_dialog,
+            "GetConfiguredVisaResources",
+            side_effect=blocking_scan,
+        ):
+            started_at = time.monotonic()
+            self.dialog.QPushButton_Widget4.click()
+            click_duration = time.monotonic() - started_at
+
+            self.assertLess(click_duration, 0.2)
+            self.assertTrue(scan_started.wait(1.0))
+            self.assertFalse(self.dialog.QPushButton_Widget4.isEnabled())
+            self.assertEqual(
+                self.dialog.QPushButton_Widget4.text(),
+                "Scanning...",
+            )
+
+            release_scan.set()
+            self.wait_for_instrument_discovery()
+
+        self.assertTrue(self.dialog.QPushButton_Widget4.isEnabled())
+        self.assertEqual(
+            self.dialog.QPushButton_Widget4.text(),
+            "Find Instruments",
         )
 
     def test_connection_selector_has_explicit_gpib_option(self):
@@ -492,9 +883,10 @@ class GuiWorkflowTests(unittest.TestCase):
         )
 
         with patch.object(
-            all_test_dialog, "ScanSelectedVisaResources", return_value=result
+            all_test_dialog, "GetConfiguredVisaResources", return_value=result
         ):
             self.dialog.QPushButton_Widget4.click()
+            self.wait_for_instrument_discovery()
 
         psu_widget = self.dialog.QLineEdit_PSU_VisaAddress
         dmm_widget = self.dialog.QLineEdit_DMM_VisaAddressforVoltage
@@ -601,9 +993,98 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(worker.resume_calls, 1)
         self.assertEqual(worker.stop_calls, 0)
 
+    def test_failure_countdown_resumes_test_after_ten_seconds(self):
+        class TimeoutSignal:
+            def __init__(self):
+                self.callback = None
+
+            def connect(self, callback):
+                self.callback = callback
+
+        class ImmediateCountdownTimer:
+            instances = []
+
+            def __init__(self, _parent):
+                self.timeout = TimeoutSignal()
+                self.interval = None
+                self.stopped = False
+                self.instances.append(self)
+
+            def setInterval(self, interval):
+                self.interval = interval
+
+            def start(self):
+                for _tick in range(10):
+                    if self.stopped:
+                        break
+                    self.timeout.callback()
+
+            def stop(self):
+                self.stopped = True
+
+        class CountdownMessageBox:
+            Warning = QMessageBox.Warning
+            AcceptRole = QMessageBox.AcceptRole
+            RejectRole = QMessageBox.RejectRole
+            messages = []
+
+            def __init__(self, _parent):
+                self.accepted = False
+
+            def setIcon(self, _icon):
+                return None
+
+            def setWindowTitle(self, _title):
+                return None
+
+            def setText(self, text):
+                self.messages.append(text)
+
+            def addButton(self, _text, _role):
+                return object()
+
+            def accept(self):
+                self.accepted = True
+
+            def exec_(self):
+                return None
+
+            def clickedButton(self):
+                return None
+
+        worker = DummyWorker()
+        self.dialog.worker = worker
+        self.dialog.fail_prompt_active = True
+
+        with patch.object(
+            all_test_dialog,
+            "QMessageBox",
+            CountdownMessageBox,
+        ), patch.object(
+            all_test_dialog,
+            "QTimer",
+            ImmediateCountdownTimer,
+        ):
+            self.dialog.handle_test_failure()
+
+        self.assertFalse(self.dialog.fail_prompt_active)
+        self.assertEqual(worker.resume_calls, 1)
+        self.assertEqual(ImmediateCountdownTimer.instances[0].interval, 1000)
+        self.assertIn("10 seconds", CountdownMessageBox.messages[0])
+        self.assertIn(
+            "resumed automatically",
+            self.dialog.OutputBox.toPlainText(),
+        )
+
     def test_continue_all_policy_does_not_pause_on_later_failures(self):
         class FailedMeasurement:
             passed = False
+            set_voltage = 5.0
+            set_current = 1.0
+            programming_error = 0.1
+            programming_percent = 2.0
+            readback_error = 0.2
+            readback_percent = 4.0
 
         worker = DummyWorker()
         self.dialog.worker = worker

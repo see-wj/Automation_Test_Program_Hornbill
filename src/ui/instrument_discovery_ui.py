@@ -6,6 +6,7 @@ def present_discovery_result(
     *,
     address_widgets,
     role_widgets=None,
+    unavailable_role_items=None,
     output_widget=None,
 ):
     widgets = tuple(address_widgets)
@@ -31,5 +32,9 @@ def present_discovery_result(
         if address not in result.addresses:
             address = result.roles.get(role)
         if address not in result.addresses:
+            fallback = (unavailable_role_items or {}).get(role)
+            if fallback is not None:
+                widget.insertItem(0, fallback)
+                widget.setCurrentIndex(0)
             continue
-        widget.setCurrentIndex(result.addresses.index(address))
+        widget.setCurrentIndex(widget.findText(address))

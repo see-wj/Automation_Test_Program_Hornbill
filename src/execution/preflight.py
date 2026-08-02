@@ -50,6 +50,25 @@ def selected_tests(checkbox_states):
     }
 
 
+def _eload_disabled(parameters):
+    return str(parameters.get("ELoad", "")).strip().lower() == "none"
+
+
+def supports_hornbill_no_eload(parameters, checkbox_states):
+    static_mode = checkbox_states.get("CurrentStatic(VoltageChange)", False)
+    scope_mode = checkbox_states.get(
+        "CurrentStatic(VoltageChange)withOscilloscope", False
+    )
+    return (
+        _eload_disabled(parameters)
+        and str(parameters.get("DUT", "")).strip().lower() == "hornbill"
+        and selected_tests(checkbox_states) == {"VoltageAccuracy"}
+        and (static_mode or scope_mode)
+        and not checkbox_states.get("CurrentChange(LoadChange)", False)
+        and not checkbox_states.get("SinkingTest", False)
+    )
+
+
 def required_instruments(checkbox_states, parameters):
     requirements = set()
     for test_name in selected_tests(checkbox_states):
@@ -69,6 +88,12 @@ def required_instruments(checkbox_states, parameters):
 
     if checkbox_states.get("Temperature"):
         requirements.add("DAQ")
+
+    if checkbox_states.get("SinkingTest"):
+        requirements.add("ExternalSource")
+
+    if supports_hornbill_no_eload(parameters, checkbox_states):
+        requirements.discard("ELoad")
 
     return requirements
 
@@ -179,6 +204,34 @@ def validate_preflight(parameters, checkbox_states):
         ):
             _number(parameters, key, errors, minimum=0)
 
+    if checkbox_states.get("SinkingTest"):
+        if str(parameters.get("DUT", "")).strip().lower() != "hornbill":
+            errors.append("Sinking Test is supported only for the Hornbill DUT")
+        if not checkbox_states.get("VoltageAccuracy"):
+            errors.append("Sinking Test requires Voltage Accuracy")
+        if checkbox_states.get(
+            "CurrentStatic(VoltageChange)withOscilloscope"
+        ):
+            errors.append(
+                "Sinking Test does not support the oscilloscope capture mode"
+            )
+        _number(
+            parameters,
+            "External_Source_Positive_Current_Limit",
+            errors,
+            positive=True,
+        )
+        negative_limit = _number(
+            parameters,
+            "External_Source_Negative_Current_Limit",
+            errors,
+        )
+        if negative_limit is not None and negative_limit >= 0:
+            errors.append(
+                "External_Source_Negative_Current_Limit must be less than zero"
+            )
+        _number(parameters, "slewrate", errors, positive=True)
+
     operational_limit_tests = oscilloscope_tests | {
         "VoltageLoadRegulation",
         "CurrentLoadRegulation",
@@ -222,6 +275,11 @@ def validate_preflight(parameters, checkbox_states):
         _number(parameters, key, errors)
 
     requirements = required_instruments(checkbox_states, parameters)
+    if _eload_disabled(parameters) and "ELoad" in requirements:
+        errors.append(
+            "The selected test requires an electronic load; choose an ELoad "
+            "address instead of None"
+        )
     if "PSU" in requirements:
         _validate_channel(parameters, "PSU_Channel", errors)
     if "ELoad" in requirements:
@@ -232,6 +290,8 @@ def validate_preflight(parameters, checkbox_states):
     addresses = {}
     for role in sorted(requirements):
         address = parameters.get(role)
+        if role == "ELoad" and _eload_disabled(parameters):
+            continue
         if not isinstance(address, str) or not address.strip():
             errors.append(f"{role} VISA address is required")
             continue

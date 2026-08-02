@@ -49,6 +49,17 @@ class InstrumentShutdownTests(unittest.TestCase):
         self.assertIn(("write", "CHROMA", "LOAD OFF"), events)
         self.assertNotIn(("write", "CHROMA", "CURR 0"), events)
 
+    def test_external_source_output_is_disabled(self):
+        events = []
+        result = shutdown_instruments(
+            {"ExternalSource": "SOURCE"},
+            lambda: FakeVisaManager(events),
+        )
+
+        self.assertTrue(result.succeeded)
+        self.assertEqual(result.attempted_roles, ("ExternalSource",))
+        self.assertIn(("write", "SOURCE", "OUTP OFF"), events)
+
     def test_resource_manager_failure_is_reported(self):
         def fail_manager_creation():
             raise RuntimeError("VISA unavailable")
@@ -60,6 +71,17 @@ class InstrumentShutdownTests(unittest.TestCase):
 
         self.assertFalse(result.succeeded)
         self.assertEqual(result.failures[0].action, "create_resource_manager")
+
+    def test_none_eload_is_not_opened_during_shutdown(self):
+        events = []
+        result = shutdown_instruments(
+            {"ELoad": "None", "PSU": "PSU"},
+            lambda: FakeVisaManager(events),
+        )
+
+        self.assertTrue(result.succeeded)
+        self.assertEqual(result.attempted_roles, ("PSU",))
+        self.assertFalse(any(event[1:2] == ("None",) for event in events))
 
 
 if __name__ == "__main__":

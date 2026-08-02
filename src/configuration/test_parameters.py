@@ -119,6 +119,13 @@ class Parameters:
         self.DMM2 = None
         self.ELoad =  None
         self.DAQ = None
+        self.ExternalSource = None
+        self.External_Source_Positive_Current_Limit = 7
+        self.External_Source_Negative_Current_Limit = -7
+        self.slewrate = 1
+        self.Sinking_Initial_Voltage = 20
+        self.Sinking_Final_Voltage = 20
+        self.Sinking_Voltage_Step_Size = 1
         self.ELoad_Channel = None
         self.PSU_Channel =  None
         self.OSC_Channel = None
@@ -132,6 +139,7 @@ class Parameters:
         self.DMM_Model = "3458A"
         self.ELoad_Model = "E367XXA"
         self.Hornbill_Measurement_Command = "DIAG"
+        self.SweepPoints = 100000
         self.Relay_Control = "None"
 
         self.setFunction =  None

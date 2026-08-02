@@ -1,0 +1,901 @@
+{
+  "source_path": "\\\\remus\\BID_RnD\\Hornbill\\Wei Jing\\CV Sweep Shu En\\CV Load Full.py",
+  "test_name": "CV Load Full",
+  "instruments": [
+    {
+      "variable": "CURR",
+      "role": "ELOAD",
+      "address": "USB0::0x2A8D::0x3902::MY60260001::0::INSTR",
+      "evidence": "VISA resource assigned at line 21"
+    },
+    {
+      "variable": "VOUT",
+      "role": "DMM",
+      "address": "USB0::0x2A8D::0x0201::MY57702174::0::INSTR",
+      "evidence": "VISA resource assigned at line 20"
+    },
+    {
+      "variable": "sock",
+      "role": "DUT/Hornbill",
+      "address": "p700-956404D4:5025",
+      "evidence": "TCP socket connected at line 110"
+    }
+  ],
+  "parameters": [
+    {
+      "name": "curr_start",
+      "value_type": "float",
+      "prompt": "Enter the starting current load (A):",
+      "default": "0",
+      "include_in_gui": true
+    },
+    {
+      "name": "curr_step",
+      "value_type": "float",
+      "prompt": "Enter the current load step interval (A):",
+      "default": "0",
+      "include_in_gui": true
+    },
+    {
+      "name": "volt_start",
+      "value_type": "float",
+      "prompt": "Enter the starting voltage (V):",
+      "default": "0",
+      "include_in_gui": true
+    },
+    {
+      "name": "volt_step",
+      "value_type": "float",
+      "prompt": "Enter the voltage step interval (V):",
+      "default": "0",
+      "include_in_gui": true
+    }
+  ],
+  "commands": [
+    {
+      "line": 23,
+      "operation": "write",
+      "receiver": "VOUT",
+      "command": ":CONFigure:VOLTage:DC DEFault,MIN",
+      "selected_mapping": "DMM_344XXA.setConfiguration",
+      "approved": true
+    },
+    {
+      "line": 24,
+      "operation": "write",
+      "receiver": "VOUT",
+      "command": ":TRIGger:SOURce BUS",
+      "selected_mapping": "DMM_344XXA.setTriggerSource",
+      "approved": true
+    },
+    {
+      "line": 83,
+      "operation": "write",
+      "receiver": "CURR",
+      "command": "OUTP OFF,(@2)",
+      "selected_mapping": "ELOAD_E363XXA.setOutputState",
+      "approved": true
+    },
+    {
+      "line": 85,
+      "operation": "send",
+      "receiver": "sock",
+      "command": "OUTP OFF,(@1)",
+      "selected_mapping": "Hornbill.outputState",
+      "approved": true
+    },
+    {
+      "line": 111,
+      "operation": "send",
+      "receiver": "sock",
+      "command": "VOLT:SENSE:SOUR EXT,(@1)",
+      "selected_mapping": "Hornbill.senseVoltageSource",
+      "approved": true
+    },
+    {
+      "line": 114,
+      "operation": "send",
+      "receiver": "sock",
+      "command": "VOLT 3,(@1)",
+      "selected_mapping": "Hornbill.sourVoltageLevelImmediateAmplitude",
+      "approved": true
+    },
+    {
+      "line": 115,
+      "operation": "send",
+      "receiver": "sock",
+      "command": "OUTP ON,(@1)",
+      "selected_mapping": "Hornbill.outputState",
+      "approved": true
+    },
+    {
+      "line": 130,
+      "operation": "send",
+      "receiver": "sock",
+      "command": "VOLT {v}, (@1)",
+      "selected_mapping": "Hornbill.sourVoltageLevelImmediateAmplitude",
+      "approved": true
+    },
+    {
+      "line": 134,
+      "operation": "write",
+      "receiver": "VOUT",
+      "command": ":INITiate:IMMediate",
+      "selected_mapping": "DMM_344XXA.initiate",
+      "approved": true
+    },
+    {
+      "line": 136,
+      "operation": "write",
+      "receiver": "VOUT",
+      "command": "*TRG",
+      "selected_mapping": "IEEEStandard.TRG",
+      "approved": true
+    },
+    {
+      "line": 141,
+      "operation": "query_ascii_values",
+      "receiver": "VOUT",
+      "command": ":STATus:OPERation:CONDition?",
+      "selected_mapping": "DMM_344XXA.operationCondition",
+      "approved": true
+    },
+    {
+      "line": 143,
+      "operation": "query_ascii_values",
+      "receiver": "VOUT",
+      "command": ":FETCh?",
+      "selected_mapping": "Fetch.query",
+      "approved": true
+    },
+    {
+      "line": 150,
+      "operation": "socket_query",
+      "receiver": "sock",
+      "command": "DIAG:PEEK? 20,0",
+      "selected_mapping": "Hornbill.measureReadbackVoltage",
+      "approved": true
+    },
+    {
+      "line": 152,
+      "operation": "socket_query",
+      "receiver": "sock",
+      "command": "DIAG:PEEK? 20,2",
+      "selected_mapping": "Hornbill.measureReadbackVoltage",
+      "approved": true
+    },
+    {
+      "line": 168,
+      "operation": "send",
+      "receiver": "sock",
+      "command": "VOLT 3,(@1)",
+      "selected_mapping": "Hornbill.sourVoltageLevelImmediateAmplitude",
+      "approved": true
+    },
+    {
+      "line": 169,
+      "operation": "write",
+      "receiver": "CURR",
+      "command": "CURR 1,(@2)",
+      "selected_mapping": "ELOAD_E363XXA.setOutputCurrent",
+      "approved": true
+    },
+    {
+      "line": 170,
+      "operation": "write",
+      "receiver": "CURR",
+      "command": "OUTP ON,(@2)",
+      "selected_mapping": "ELOAD_E363XXA.setOutputState",
+      "approved": true
+    },
+    {
+      "line": 182,
+      "operation": "send",
+      "receiver": "sock",
+      "command": "VOLT 3,(@1)",
+      "selected_mapping": "Hornbill.sourVoltageLevelImmediateAmplitude",
+      "approved": true
+    },
+    {
+      "line": 184,
+      "operation": "write",
+      "receiver": "CURR",
+      "command": "SOUR:CURR:LEV:IMM:AMPL {i},(@2)",
+      "selected_mapping": "ELOAD_E363XXA.setOutputCurrent",
+      "approved": true
+    },
+    {
+      "line": 200,
+      "operation": "send",
+      "receiver": "sock",
+      "command": "VOLT {v}, (@1)",
+      "selected_mapping": "Hornbill.sourVoltageLevelImmediateAmplitude",
+      "approved": true
+    },
+    {
+      "line": 204,
+      "operation": "write",
+      "receiver": "VOUT",
+      "command": ":INITiate:IMMediate",
+      "selected_mapping": "DMM_344XXA.initiate",
+      "approved": true
+    },
+    {
+      "line": 206,
+      "operation": "write",
+      "receiver": "VOUT",
+      "command": "*TRG",
+      "selected_mapping": "IEEEStandard.TRG",
+      "approved": true
+    },
+    {
+      "line": 211,
+      "operation": "query_ascii_values",
+      "receiver": "VOUT",
+      "command": ":STATus:OPERation:CONDition?",
+      "selected_mapping": "DMM_344XXA.operationCondition",
+      "approved": true
+    },
+    {
+      "line": 213,
+      "operation": "query_ascii_values",
+      "receiver": "VOUT",
+      "command": ":FETCh?",
+      "selected_mapping": "Fetch.query",
+      "approved": true
+    },
+    {
+      "line": 220,
+      "operation": "socket_query",
+      "receiver": "sock",
+      "command": "DIAG:PEEK? 20,0",
+      "selected_mapping": "Hornbill.measureReadbackVoltage",
+      "approved": true
+    },
+    {
+      "line": 222,
+      "operation": "socket_query",
+      "receiver": "sock",
+      "command": "DIAG:PEEK? 20,2",
+      "selected_mapping": "Hornbill.measureReadbackVoltage",
+      "approved": true
+    },
+    {
+      "line": 238,
+      "operation": "write",
+      "receiver": "CURR",
+      "command": "OUTP OFF,(@2)",
+      "selected_mapping": "ELOAD_E363XXA.setOutputState",
+      "approved": true
+    },
+    {
+      "line": 239,
+      "operation": "send",
+      "receiver": "sock",
+      "command": "OUTP OFF,(@1)",
+      "selected_mapping": "Hornbill.outputState",
+      "approved": true
+    },
+    {
+      "line": 253,
+      "operation": "write",
+      "receiver": "CURR",
+      "command": "OUTP OFF,(@2)",
+      "selected_mapping": "ELOAD_E363XXA.setOutputState",
+      "approved": true
+    },
+    {
+      "line": 254,
+      "operation": "send",
+      "receiver": "sock",
+      "command": "OUTP OFF,(@1)",
+      "selected_mapping": "Hornbill.outputState",
+      "approved": true
+    }
+  ],
+  "safety": {
+    "maximum_voltage": "61",
+    "maximum_current": "20.1",
+    "maximum_power": "300",
+    "polling_timeout_seconds": 30.0,
+    "settling_delay_seconds": 5.0,
+    "checkpoint_each_point": true,
+    "guaranteed_shutdown": true,
+    "confirmed_by_developer": true
+  },
+  "sweeps": [
+    {
+      "line": 117,
+      "name": "sweep_values",
+      "start": "volt_start",
+      "stop": "61",
+      "step": "volt_step"
+    },
+    {
+      "line": 173,
+      "name": "curr_values",
+      "start": "curr_start",
+      "stop": "20.1",
+      "step": "curr_step"
+    },
+    {
+      "line": 188,
+      "name": "sweep_values",
+      "start": "volt_start",
+      "stop": "61",
+      "step": "volt_step"
+    }
+  ],
+  "outputs": [
+    {
+      "line": 67,
+      "operation": "to_excel",
+      "path": "C:/Users/shuepoh6/OneDrive - Keysight Technologies/Documents/raw_data.xlsx"
+    }
+  ],
+  "data_fields": [
+    "Current Load (A)",
+    "Output Voltage (V)",
+    "Set Voltage (V)",
+    "VLOC (V)",
+    "VMON (V)"
+  ],
+  "warnings": [
+    "The script opens VISA resources directly; integration should use project session and cleanup helpers.",
+    "VISA resources are opened outside a cleanup-protected try/finally at line(s): 20, 21.",
+    "Socket communication has no detected timeout and may block indefinitely.",
+    "Unbounded while-loop polling requires timeout, delay, and abort checks at line(s): 140, 210.",
+    "Hardcoded VISA addresses should become GUI/configuration parameters.",
+    "Hardcoded socket host/port values should become configuration parameters.",
+    "Interactive input() parameters should become validated GUI fields.",
+    "2 command(s) have no likely SCPI library mapping and require developer review.",
+    "No instrument error-query command was detected.",
+    "Bare except blocks hide cleanup or communication failures at line(s): 86, 99, 255, 263.",
+    "Hardcoded user-specific output paths should use RunContext storage.",
+    "Global keyboard polling should be replaced by TestWorker checkpoints."
+  ],
+  "integration_steps": [
+    "Confirm each inferred instrument role using *IDN? before selecting a driver.",
+    "Create a dedicated test class under DUT_Test_Scripts or src/instruments.",
+    "Review unmapped SCPI and add approved wrappers to the appropriate SCPI library.",
+    "Expose addresses, sweep values, limits, timing, and output options through configuration.",
+    "Use TestWorker checkpoints for pause, resume, abort, and bounded polling.",
+    "Define required instruments and safety limits in execution/preflight.py.",
+    "Write results through RunContext and the project report exporters.",
+    "Add deterministic simulation tests before real-hardware execution."
+  ],
+  "schema_version": 2,
+  "generated_at": "2026-08-02T14:07:17",
+  "status": "approved",
+  "review_issues": [],
+  "command_bindings": [
+    {
+      "line": 23,
+      "mapping": "DMM_344XXA.setConfiguration",
+      "arguments": [
+        {
+          "name": "mode",
+          "expression": "VOLTage:DC DEFault,MIN",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 24,
+      "mapping": "DMM_344XXA.setTriggerSource",
+      "arguments": [
+        {
+          "name": "source",
+          "expression": "BUS",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 83,
+      "mapping": "ELOAD_E363XXA.setOutputState",
+      "arguments": [
+        {
+          "name": "state",
+          "expression": "OFF",
+          "source": "literal"
+        },
+        {
+          "name": "ChannelNumber",
+          "expression": "2",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 85,
+      "mapping": "Hornbill.outputState",
+      "arguments": [
+        {
+          "name": "state",
+          "expression": "OFF",
+          "source": "literal"
+        },
+        {
+          "name": "ChannelNumber",
+          "expression": "1",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 111,
+      "mapping": "Hornbill.senseVoltageSource",
+      "arguments": [
+        {
+          "name": "Mode",
+          "expression": "EXT",
+          "source": "literal"
+        },
+        {
+          "name": "ChannelNumber",
+          "expression": "1",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 114,
+      "mapping": "Hornbill.sourVoltageLevelImmediateAmplitude",
+      "arguments": [
+        {
+          "name": "Value",
+          "expression": "3",
+          "source": "literal"
+        },
+        {
+          "name": "ChannelNumber",
+          "expression": "1",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 115,
+      "mapping": "Hornbill.outputState",
+      "arguments": [
+        {
+          "name": "state",
+          "expression": "ON",
+          "source": "literal"
+        },
+        {
+          "name": "ChannelNumber",
+          "expression": "1",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 130,
+      "mapping": "Hornbill.sourVoltageLevelImmediateAmplitude",
+      "arguments": [
+        {
+          "name": "Value",
+          "expression": "v",
+          "source": "loop"
+        },
+        {
+          "name": "ChannelNumber",
+          "expression": "1",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 134,
+      "mapping": "DMM_344XXA.initiate",
+      "arguments": []
+    },
+    {
+      "line": 136,
+      "mapping": "IEEEStandard.TRG",
+      "arguments": [
+        {
+          "name": "VISA_ADDRESS",
+          "expression": "VOUT",
+          "source": "instrument_address"
+        }
+      ]
+    },
+    {
+      "line": 141,
+      "mapping": "DMM_344XXA.operationCondition",
+      "arguments": []
+    },
+    {
+      "line": 143,
+      "mapping": "Fetch.query",
+      "arguments": []
+    },
+    {
+      "line": 150,
+      "mapping": "Hornbill.measureReadbackVoltage",
+      "arguments": [
+        {
+          "name": "ChannelNumber",
+          "expression": "1",
+          "source": "literal"
+        },
+        {
+          "name": "mode",
+          "expression": "DIAG",
+          "source": "literal"
+        },
+        {
+          "name": "diagnostic_input",
+          "expression": "VMON",
+          "source": "literal"
+        },
+        {
+          "name": "sample",
+          "expression": "100000",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 152,
+      "mapping": "Hornbill.measureReadbackVoltage",
+      "arguments": [
+        {
+          "name": "ChannelNumber",
+          "expression": "1",
+          "source": "literal"
+        },
+        {
+          "name": "mode",
+          "expression": "DIAG",
+          "source": "literal"
+        },
+        {
+          "name": "diagnostic_input",
+          "expression": "VLOC",
+          "source": "literal"
+        },
+        {
+          "name": "sample",
+          "expression": "100000",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 168,
+      "mapping": "Hornbill.sourVoltageLevelImmediateAmplitude",
+      "arguments": [
+        {
+          "name": "Value",
+          "expression": "3",
+          "source": "literal"
+        },
+        {
+          "name": "ChannelNumber",
+          "expression": "1",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 169,
+      "mapping": "ELOAD_E363XXA.setOutputCurrent",
+      "arguments": [
+        {
+          "name": "value",
+          "expression": "1",
+          "source": "literal"
+        },
+        {
+          "name": "ChannelNumber",
+          "expression": "2",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 170,
+      "mapping": "ELOAD_E363XXA.setOutputState",
+      "arguments": [
+        {
+          "name": "state",
+          "expression": "ON",
+          "source": "literal"
+        },
+        {
+          "name": "ChannelNumber",
+          "expression": "2",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 182,
+      "mapping": "Hornbill.sourVoltageLevelImmediateAmplitude",
+      "arguments": [
+        {
+          "name": "Value",
+          "expression": "3",
+          "source": "literal"
+        },
+        {
+          "name": "ChannelNumber",
+          "expression": "1",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 184,
+      "mapping": "ELOAD_E363XXA.setOutputCurrent",
+      "arguments": [
+        {
+          "name": "value",
+          "expression": "i",
+          "source": "loop"
+        },
+        {
+          "name": "ChannelNumber",
+          "expression": "2",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 200,
+      "mapping": "Hornbill.sourVoltageLevelImmediateAmplitude",
+      "arguments": [
+        {
+          "name": "Value",
+          "expression": "v",
+          "source": "loop"
+        },
+        {
+          "name": "ChannelNumber",
+          "expression": "1",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 204,
+      "mapping": "DMM_344XXA.initiate",
+      "arguments": []
+    },
+    {
+      "line": 206,
+      "mapping": "IEEEStandard.TRG",
+      "arguments": [
+        {
+          "name": "VISA_ADDRESS",
+          "expression": "VOUT",
+          "source": "instrument_address"
+        }
+      ]
+    },
+    {
+      "line": 211,
+      "mapping": "DMM_344XXA.operationCondition",
+      "arguments": []
+    },
+    {
+      "line": 213,
+      "mapping": "Fetch.query",
+      "arguments": []
+    },
+    {
+      "line": 220,
+      "mapping": "Hornbill.measureReadbackVoltage",
+      "arguments": [
+        {
+          "name": "ChannelNumber",
+          "expression": "1",
+          "source": "literal"
+        },
+        {
+          "name": "mode",
+          "expression": "DIAG",
+          "source": "literal"
+        },
+        {
+          "name": "diagnostic_input",
+          "expression": "VMON",
+          "source": "literal"
+        },
+        {
+          "name": "sample",
+          "expression": "100000",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 222,
+      "mapping": "Hornbill.measureReadbackVoltage",
+      "arguments": [
+        {
+          "name": "ChannelNumber",
+          "expression": "1",
+          "source": "literal"
+        },
+        {
+          "name": "mode",
+          "expression": "DIAG",
+          "source": "literal"
+        },
+        {
+          "name": "diagnostic_input",
+          "expression": "VLOC",
+          "source": "literal"
+        },
+        {
+          "name": "sample",
+          "expression": "100000",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 238,
+      "mapping": "ELOAD_E363XXA.setOutputState",
+      "arguments": [
+        {
+          "name": "state",
+          "expression": "OFF",
+          "source": "literal"
+        },
+        {
+          "name": "ChannelNumber",
+          "expression": "2",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 239,
+      "mapping": "Hornbill.outputState",
+      "arguments": [
+        {
+          "name": "state",
+          "expression": "OFF",
+          "source": "literal"
+        },
+        {
+          "name": "ChannelNumber",
+          "expression": "1",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 253,
+      "mapping": "ELOAD_E363XXA.setOutputState",
+      "arguments": [
+        {
+          "name": "state",
+          "expression": "OFF",
+          "source": "literal"
+        },
+        {
+          "name": "ChannelNumber",
+          "expression": "2",
+          "source": "literal"
+        }
+      ]
+    },
+    {
+      "line": 254,
+      "mapping": "Hornbill.outputState",
+      "arguments": [
+        {
+          "name": "state",
+          "expression": "OFF",
+          "source": "literal"
+        },
+        {
+          "name": "ChannelNumber",
+          "expression": "1",
+          "source": "literal"
+        }
+      ]
+    }
+  ],
+  "execution_plan": {
+    "template": "cv_voltage_current_sweep_v1",
+    "power_limit_source": "safety.maximum_power",
+    "setup_command_lines": [
+      23,
+      24,
+      111,
+      114,
+      115
+    ],
+    "transition_command_lines": [
+      168,
+      169,
+      170
+    ],
+    "shutdown_command_lines": [
+      238,
+      239
+    ],
+    "phases": [
+      {
+        "name": "no_load_voltage_sweep",
+        "fixed_values": {
+          "i": 0.0
+        },
+        "loops": [
+          {
+            "variable": "v",
+            "sweep": {
+              "line": 117,
+              "name": "sweep_values",
+              "start": "volt_start",
+              "stop": "61",
+              "step": "volt_step"
+            }
+          }
+        ],
+        "point_command_lines": [
+          130,
+          134,
+          136,
+          141,
+          143,
+          150,
+          152
+        ]
+      },
+      {
+        "name": "loaded_current_voltage_sweep",
+        "loops": [
+          {
+            "variable": "i",
+            "sweep": {
+              "line": 173,
+              "name": "curr_values",
+              "start": "curr_start",
+              "stop": "20.1",
+              "step": "curr_step"
+            }
+          },
+          {
+            "variable": "v",
+            "sweep": {
+              "line": 188,
+              "name": "sweep_values",
+              "start": "volt_start",
+              "stop": "61",
+              "step": "volt_step"
+            }
+          }
+        ],
+        "outer_setup_command_lines": [
+          182,
+          184
+        ],
+        "point_command_lines": [
+          200,
+          204,
+          206,
+          211,
+          213,
+          220,
+          222
+        ]
+      }
+    ],
+    "measurement_fields": {
+      "current": "Current Load (A)",
+      "voltage": "Set Voltage (V)",
+      "fetch": "Output Voltage (V)",
+      "diagnostic_0": "VMON (V)",
+      "diagnostic_2": "VLOC (V)"
+    }
+  }
+}

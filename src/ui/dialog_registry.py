@@ -23,6 +23,18 @@ class DialogRegistry:
             for registration in self.registrations[2:]
         )
 
+    def indexed_selection_options(self, owner_attributes=None):
+        included = set(owner_attributes) if owner_attributes is not None else None
+        return tuple(
+            (index, registration.title, registration.description)
+            for index, registration in enumerate(self.registrations)
+            if index >= 2
+            and (
+                included is None
+                or registration.owner_attribute in included
+            )
+        )
+
     def open(self, owner, index):
         if index < 0 or index >= len(self.registrations):
             self.message_sink(f"Invalid dialog index: {index}")

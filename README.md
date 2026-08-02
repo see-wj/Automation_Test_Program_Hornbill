@@ -96,10 +96,10 @@ During a test run, SCPI wrappers reuse one VISA session per instrument address.
 Sessions are isolated to the worker thread, closed before final hardware shutdown,
 and remain independent from GUI discovery and preflight connections.
 Production test execution and cooperative pause, resume, and abort behavior live in
-`src/execution/test_worker.py`; `src/GUI.py` owns presentation and signal wiring.
-`src/GUI.py` remains the application entry point and legacy-dialog host, while the
-production `AllTestMeasurement` dialog and its direct UI helpers live in
-`src/ui/all_test_dialog.py`.
+`src/execution/test_worker.py`; `src/GUI.py` owns the application bootstrap and
+main launcher window. Production `AllTestMeasurement` presentation and signal
+wiring live in `src/ui/all_test_dialog.py`. Retired monolithic dialogs are archived
+in `src/legacy/legacy_gui.py` and are not imported by the production application.
 Mutable GUI parameter state and setup-file loading live in
 `src/configuration/test_parameters.py`, keeping dialog construction separate from configuration data.
 Each execution receives a `RunContext` from `src/execution/run_context.py`. It owns the run
@@ -177,6 +177,87 @@ The suite uses mocked VISA resources and does not communicate with real instrume
 The Windows CI workflow in `.github/workflows/tests.yml` installs the locked
 dependencies and runs this command for every push and pull request.
 
+### Blynk Mobile Monitoring
+
+Bundle Test can optionally send live values to Blynk without blocking the GUI or
+instrument worker. The publisher combines the latest values into one HTTPS batch
+at a five-second interval by default. Network failures only update the Blynk
+status label; they never pause or abort the hardware test. Excel and CSV files
+remain the permanent test record.
+
+Create matching Blynk virtual-pin datastreams:
+
+| Pin | Value |
+| --- | --- |
+| `V0` | PSU voltage set |
+| `V1` | load current set |
+| `V2` | measured/programming voltage |
+| `V3` | PSU readback voltage |
+| `V4` | PSU readback current |
+| `V5` | programming error, percent of specification limit |
+| `V6` | readback error, percent of specification limit |
+| `V7` | test state |
+| `V8` | progress percentage |
+| `V10` | DAQ channel 101 temperature |
+| `V11` | DAQ channel 103 temperature |
+| `V12` | DAQ channel 104 temperature |
+| `V13` | configured number of data collections |
+| `V14` | DUT/PSU channel (`1`–`4` or `ALL`) |
+| `V16` | DAQ channel 105 temperature |
+
+Set the device token and the server shown by Blynk before launching the program:
+
+```powershell
+$env:BLYNK_AUTH_TOKEN = "your-device-token"
+$env:BLYNK_SERVER = "blynk.cloud"
+$env:BLYNK_UPDATE_INTERVAL = "5"
+$env:BLYNK_ERROR_EVENT_CODE = "test_error"
+$env:BLYNK_START_EVENT_CODE = "test_start"
+$env:BLYNK_COMPLETION_EVENT_CODE = "test_complete"
+python src/GUI.py
+```
+
+Then enable **Send Live Data to Blynk** under **Auxiliary Equipment**. Do not
+store the device token in a project configuration file or commit it to Git.
+
+For push notifications, create a custom event in the Blynk template:
+
+- Name: `Test Error`
+- Event code: `test_error`
+- Type: `Critical` or `Warning`
+- Timeline recording: enabled
+- Notifications: enabled
+- Recipient: device owner
+- Notification limit: one per minute or longer
+
+The program triggers this event for measurement boundary failures and unhandled
+test crashes. Notifications use the same background network thread as live data,
+have a local 60-second cooldown, and never pause or abort instrument execution.
+
+Create a second custom event for test start:
+
+- Name: `Test Start`
+- Event code: `test_start`
+- Type: `Information`
+- Timeline recording: enabled
+- Notifications: enabled
+- Recipient: device owner
+
+The start message is sent after the run enters the `RUNNING` state and includes
+the DUT, selected channel, and configured number of data collections.
+
+Create a third custom event for successful completion:
+
+- Name: `Test Complete`
+- Event code: `test_complete`
+- Type: `Information`
+- Timeline recording: enabled
+- Notifications: enabled
+- Recipient: device owner
+
+The completion message includes the DUT, selected channel, and configured number
+of data collections.
+
 ### Run Static Analysis
 
 Ruff checks undefined names and unused imports in the modernized modules and test
@@ -239,10 +320,55 @@ git pull
 - If you want to build it manually, you can use the included `Make_GUI_Executable_Program.py` build script:
 
 ```cmd
-python Make_GUI_Executable_Program.py
+.venv1\Scripts\python.exe Make_GUI_Executable_Program.py
 ```
 
-The generated `.exe` will be inside the `src` folder.
+The generated package is written to a timestamped folder under
+`Executable_Builds`. Keep the editable `Instrument_Config_Files`,
+`setup_images`, and `csv` folders beside `Test_Automation_Program.exe`.
+
+### Software updates without reinstalling
+
+Packaged builds include a separate `Program_Updater.exe` and a
+**Software Update** tab. The updater never replaces files while the main
+program is running.
+
+Each build produces:
+
+```text
+Executable_Builds/<timestamp>/
+├── Test_Automation_Program/
+├── Test_Automation_Program-<version>.zip
+└── update_manifest.json
+```
+
+Publisher workflow:
+
+1. Set the release number in `VERSION`, or set
+   `AUTOMATION_BUILD_VERSION` before building.
+2. Run `Make_GUI_Executable_Program.py`.
+3. Copy the generated ZIP and `update_manifest.json` into the same internal
+   network-share or HTTPS release folder.
+4. Edit `release_notes` and `mandatory` if needed. Do not change the
+   generated ZIP filename or SHA-256 value.
+
+For GitHub publishing, push a version tag such as `v0.2.0`. The
+`Build and Publish Release` workflow builds the package and attaches the ZIP
+and manifest to the matching GitHub Release automatically.
+
+User workflow:
+
+1. Open the **Software Update** tab.
+2. Enter the shared manifest path, such as
+   `\\server\share\Automation\update_manifest.json`.
+3. Select **Save Source**, then **Check for Updates**.
+4. Select **Download and Install**. The application closes, installs the
+   verified package, and restarts automatically.
+
+The package SHA-256 is verified before installation. The old application
+folder remains available as `Test_Automation_Program.previous`, and an
+installation failure restores the previous folder automatically. Existing
+`Instrument_Config_Files` and `csv` contents are preserved.
 
 ---
 ## 👤 Authors

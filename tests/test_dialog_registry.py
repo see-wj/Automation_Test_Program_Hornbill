@@ -42,6 +42,20 @@ class DialogRegistryTests(unittest.TestCase):
         self.assertIsNone(registry.open(object(), 3))
         self.assertEqual(messages, ["Invalid dialog index: 3"])
 
+    def test_indexed_selection_options_can_lock_unlisted_dialogs(self):
+        registry = DialogRegistry(
+            (
+                DialogRegistration("Bundle", "Production", "bundle", DummyDialog),
+                DialogRegistration("Screenshot", "Capture", "screenshot", DummyDialog),
+                DialogRegistration("Voltage", "Measure", "voltage", DummyDialog),
+                DialogRegistration("Calibration", "Calibrate", "calibration", DummyDialog),
+            )
+        )
+
+        options = registry.indexed_selection_options({"calibration"})
+
+        self.assertEqual(options, ((3, "Calibration", "Calibrate"),))
+
 
 if __name__ == "__main__":
     unittest.main()

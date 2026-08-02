@@ -9,6 +9,7 @@ SELECTION_WIDGETS = {
     "CurrentStatic(VoltageChange)": "QCheckBox_Voltage_Accuracy_Voltage_Mode_Widget",
     "CurrentChange(LoadChange)": "QCheckBox_Voltage_Accuracy_Current_Mode_Widget",
     "CurrentStatic(VoltageChange)withOscilloscope": "QCheckBox_Voltage_Accuracy_Voltage_Mode_Oscilloscope_Widget",
+    "SinkingTest": "QCheckBox_Sinking_Test_Widget",
     "Current_Test": "QPushButton_Current_Widget",
     "CurrentAccuracy": "QCheckBox_CurrentAccuracy_Widget",
     "CurrentAccuracy_20A_Range": "QCheckBox_Current_Accuracy_20A_Range_Widget",
@@ -22,6 +23,7 @@ SELECTION_WIDGETS = {
     "DataReport": "QCheckBox_Report_Widget",
     "DataImage": "QCheckBox_Image_Widget",
     "Temperature": "QCheckBox_Temperature_Widget",
+    "Blynk": "QCheckBox_Blynk_Widget",
     "TransientRecovery": "QCheckBox_TransientRecovery_Widget",
     "VoltageLoadRegulation": "QCheckBox_VoltageLoadRegulation_Widget",
     "CurrentLoadRegulation": "QCheckBox_CurrentLoadRegulation_Widget",
@@ -68,7 +70,6 @@ def create_current_selection_widget(dialog, heading):
     ):
         branch_layout.addWidget(getattr(dialog, widget_name))
     layout.addWidget(branch)
-
     for widget_name in (
         "QCheckBox_CurrentLoadRegulation_Widget",
         "QCheckBox_PowerAccuracy_Widget",
@@ -92,6 +93,7 @@ def create_voltage_selection_widget(dialog, heading):
         "QCheckBox_Voltage_Accuracy_Voltage_Mode_Widget",
         "QCheckBox_Voltage_Accuracy_Current_Mode_Widget",
         "QCheckBox_Voltage_Accuracy_Voltage_Mode_Oscilloscope_Widget",
+        "QCheckBox_Sinking_Test_Widget",
     ):
         branch_layout.addWidget(getattr(dialog, widget_name))
     layout.addWidget(branch)

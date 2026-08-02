@@ -1,398 +1,273 @@
-""" Module containing all of the test options available in this program. 
+"""Hornbill voltage-accuracy measurement without an electronic load."""
 
-    The tests are categorized into different classes. 
-    Notes: Tests RiseFallTime & ProgrammingSpeed are only compatible with
-    certain Oscilloscopes using the Keysight Library. Hence, the default 
-    library is only set to Keysight
-
-"""
-import numpy as np
-import os
-import pyvisa 
-from pyvisa import VisaIOError
-import sys
-import csv
-import pandas as pd
+import math
 from datetime import datetime
-from time import time
+from pathlib import Path
+
 from DUT_Test_Scripts.execution_control import sleep
-from SCPI_Library.visa_config import configure_visa_resource
-from openpyxl import Workbook
-from openpyxl.utils import get_column_letter
-import traceback
+from DUT_Test_Scripts.scpi_runtime import (
+    HornbillDimport as Dimport,
+    execution_checkpoint,
+)
+from DUT_Test_Scripts.Hornbill.Hornbill_DUT_Test_With_ELoad import (
+    _measure_hornbill_readback,
+)
+from SCPI_Library.IEEEStandard import RST, TRG, WAI
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from SCPI_Library.IEEEStandard import OPC, WAI, TRG, RST, CLS
-from SCPI_Library.Keysight import *
 
-#Dictionary
-class dictGenerator(object):
-    """Accept the Parameters Input from GUI"""
-    def __init__():
-        pass
+def _percentage_of_limit(error, upper_limit):
+    if upper_limit == 0:
+        return 0.0 if error == 0 else float("inf")
+    return (error / upper_limit) * 100.0
 
-    def input(**kwargs):
-        return kwargs
 
-#Import SCPI command list
-class Dimport:
-    """Import SCPI Library py class to DUT_Test"""
-
-    def __init__():
-        pass
-
-    def getClasses(module_name):
-        """Declare the module based on the module name given
-
-        Args:
-            module_name: Determines which library will the program import from
-
-        Returns:
-            Returns a set of Modules imported from a library
-        """
-
-        module_full_name = f"SCPI_Library.{module_name}"
-        module = __import__(module_full_name, fromlist=["*"])
-        Read = getattr(module, "Read")
-        Apply = getattr(module, "Apply")
-        Display = getattr(module, "Display")
-        Function = getattr(module, "Function")
-        Frequency = getattr(module, "Frequency")
-        Output = getattr(module, "Output")
-        Measure = getattr(module, "Measure")
-        Sense = getattr(module, "Sense")
-        Configure = getattr(module, "Configure")
-        Delay = getattr(module, "Delay")
-        Trigger = getattr(module, "Trigger")
-        Sample = getattr(module, "Sample")
-        Initiate = getattr(module, "Initiate")
-        Fetch = getattr(module, "Fetch")
-        Status = getattr(module, "Status")
-        Voltage = getattr(module, "Voltage")
-        Current = getattr(module, "Current")
-        Oscilloscope = getattr(module, "Oscilloscope")
-        Excavator = getattr(module, "Excavator")
-        SMU = getattr(module, "SMU")
-        Power = getattr(module, "Power")
-
-        return (
-            Read,
-            Apply,
-            Display,
-            Function,
-            Frequency,
-            Output,
-            Measure,
-            Sense,
-            Configure,
-            Delay,
-            Trigger,
-            Sample,
-            Initiate,
-            Fetch,
-            Status,
-            Voltage,
-            Current,
-            Oscilloscope,
-            Excavator,
-            SMU,
-            Power,
-        )
-
-#Check Visa IO address
-class VisaResourceManager:
-    """Manage the VISA Resources
-
-    Attributes:
-        args: args should contain one or multiple string containing the Visa Address of an dict["Instrument"]
-
-    """
-
-    def __init__(self):
-        """Initiate the object rm as Resource Manager"""
-        rm = pyvisa.ResourceManager()
-        self.rm = rm
-
-    def openRM(self, *args):
-        """Open the VISA Resources to be used
-
-        The program also initiates and standardize certain specifications such as the baud rate.
-
-            Args:
-                *args: to declare single or multiple VISA Resources
-
-            Returns:
-                Return a Boolean to the program whether there were any errors encountered.
-
-            Raises:
-                VisaIOError: An error occured when opening PyVisa Resources
-
-        """
-        try:
-            for i in range(len(args)):
-                instr = configure_visa_resource(self.rm.open_resource(args[i]))
-                instr.baud_rate = 9600
-
-            return 1, None
-        except pyvisa.VisaIOError as e:
-            print(e.args)
-            return 0, e.args
-
-    def closeRM(self):
-        """Closes the Visa Resources when not in used"""
-        self.rm.close()
-
-######################################################################
 class HornbillVoltageMeasurementNoELoad:
+    """Run the Hornbill voltage sweep at the natural no-load current."""
 
     def __init__(self):
-        self.results = []
         self.infoList = []
         self.dataList = []
         self.dataList2 = []
 
-    def Execute_Voltage_Accuracy(self,dict,channel):
-        (
-            Read,
-            Apply,
-            Display,
-            Function,
-            Frequency,
-            Output,
-            Measure,
-            Sense,
-            Configure,
-            Delay,
-            Trigger,
-            Sample,
-            Initiate,
-            Fetch,
-            Status,
-            Voltage,
-            Current,
-            Oscilloscope,
-            Excavator,
-            SMU,
-            Power,
-            Hornbill,
-        ) = Dimport.getClasses(dict["Instrument"])
-
-        RST(dict["PSU"])
-        WAI(dict["PSU"])
-        """RST(dict["ELoad"])
-        WAI(dict["ELoad"])"""
-        RST(dict["DMM"])
-        WAI(dict["DMM"])
-
-        #Channel Loop (For usage of All Channels, the channel is taken from Execute Function in GUI.py)
-        ch = channel
-
-        #Use ch for each individual channel
-        print(f"Channel {ch} Test Running\n")
-        print("")
-        
-        #New Command 
-        """ Excavator(dict["PSU"]).setSYSTEMEMULationMode("SOUR")
-        WAI(dict["PSU"])
-        Excavator(dict["ELoad"]).setSYSTEMEMULationMode("LOAD")
-        WAI(dict["ELoad"])"""
-        #offset
-        sleep(3)
-
-        # Instrument Initialization
-        Configure(dict["DMM"]).write("Voltage")
-        Trigger(dict["DMM"]).setSource("BUS")
-        Sense(dict["DMM"]).setVoltageResDC(dict["VoltageRes"])
-        """Function(dict["ELoad"]).setMode(dict["setFunction"])"""
-        Function(dict["PSU"]).setMode("Voltage")
-
-        #Instrument Channel Set
-        Voltage(dict["PSU"]).setInstrumentChannel(ch)
-        """Voltage(dict["ELoad"]).setInstrumentChannel(dict["ELoad_Channel"])"""
-        sleep(2)
-
-        #Set Series/Parallel Mode
-        if dict["OperationMode"] == "Series":
-            Output(dict["PSU"]).SPModeConnection("SER")
-            WAI(dict["PSU"])
-        elif dict["OperationMode"] == "Parallel":
-            Output(dict["PSU"]).SPModeConnection("PAR")
-            WAI(dict["PSU"])
-        else:
-            Output(dict["PSU"]).SPModeConnection("OFF")
-            WAI(dict["PSU"])
-
-        #Set Current and Sense Mode
-        Voltage(dict["PSU"]).setSenseModeMultipleChannel(dict["VoltageSense"], ch)
-        """Voltage(dict["ELoad"]).setSenseModeMultipleChannel(dict["VoltageSense"], dict["ELoad_Channel"])"""
-
-        #DMM Mode
-        Voltage(dict["DMM"]).setNPLC(dict["Aperture"])
-        Voltage(dict["DMM"]).setAutoZeroMode(dict["AutoZero"])
-        Voltage(dict["DMM"]).setAutoImpedanceMode(dict["InputZ"])
-
-        if dict["Range"] == "Auto":
-            Sense(dict["DMM"]).setVoltageRangeDCAuto()
-
-        else:
-            Sense(dict["DMM"]).setVoltageRangeDC(dict["Range"])
-
-        #Programming Parameters
-        self.param1 = float(dict["Programming_Error_Gain"])
-        self.param2 = float(dict["Programming_Error_Offset"])
-        self.param3 = float(dict["Readback_Error_Gain"])
-        self.param4 = float(dict["Readback_Error_Offset"])
-        self.unit = dict["unit"]
-        self.updatedelay = float(dict["updatedelay"])
-
-        #Set Program Loop Using Step Size
-        self.Power = float(dict["power"])
-        i = 0   #Current Iteration
-        j = 0   #Voltage Iteration
-        k = 0   #Step of Iteration
-        I_fixedOS = 0                               #Offset Current (Manually Added)
-        I_fixed = float(dict["minCurrent"])         #Min Current
-        V = float(dict["minVoltage"])
-        I = float(dict["maxVoltage"]) + 1
-        current_iter = (
-            (float(dict["maxCurrent"]) - float(dict["minCurrent"]))
-            / float(dict["current_step_size"])
-        ) + 1
-        voltage_iter = (
-            (float(dict["maxVoltage"]) - float(dict["minVoltage"]))
-            / float(dict["voltage_step_size"])
-        ) + 1
-        sleep(1)
-
-        #Current LIMIT (Max for Voltage Accuracy)
-        Current(dict["PSU"]).setOutputCurrent("MAXimum")
-        WAI(dict["PSU"])
-        
-        #Turn On the PSU and Eload
-        Output(dict["PSU"]).setOutputState("ON")
-        WAI(dict["PSU"])
-        """Output(dict["ELoad"]).setOutputState("ON")
-        WAI(dict["ELoad"])"""
-
-        #Clear the Error Status
-        CLS(dict["PSU"])
-        WAI(dict["PSU"])
-        """CLS(dict["ELoad"])
-        WAI(dict["ELoad"])"""
-        CLS(dict["DMM"])
-        WAI(dict["DMM"])
-        
-        #Run Test (Voltage Loop in Current Loop)
-        while i < current_iter:
-            j = 0
-            V = float(dict["minVoltage"])
-            Iset = float(Current(dict["PSU"]).SourceCurrentLevel()) #Query Current Level
-
-            if I_fixed > float(dict["maxCurrent"]):
-                I_fixed= float(dict["maxCurrent"])
-
-            #If minimum current is 0, set to 1A
-            if I_fixed == 0:           
-                I_fixedOS = 1
-                I_fixed = I_fixed + I_fixedOS
-
-            #If PSU MAX I = ELOAD MAX I (Reduce Eload I by 0.1 - Prevent Overload)
-            if I_fixed == float(dict["maxCurrent"]) and Iset == float(dict["maxCurrent"]):
-                """Current(dict["ELoad"]).setOutputCurrent(I_fixed - 0.1)
-                WAI(dict["ELoad"])"""
+    @staticmethod
+    def _configure_dmm(configuration, classes):
+        Sense = classes[7]
+        DMM_344XXA = classes[22]
+        DMM_3458A = classes[23]
+        model = configuration["DMM_Model"]
+        if model == "344xxA":
+            dmm = DMM_344XXA(configuration["DMM"])
+            dmm.setNPLC(configuration["Aperture"])
+            dmm.setAutoZeroMode(configuration["AutoZero"])
+            dmm.setAutoImpedanceMode(configuration["InputZ"])
+            dmm.setConfiguration("VOLT")
+            dmm.setTriggerSource("BUS")
+            dmm.setVoltageResolutionDC("HIGH")
+            if configuration["Range"] == "Auto":
+                Sense(configuration["DMM"]).setVoltageRangeDCAuto()
             else:
-                """Current(dict["ELoad"]).setOutputCurrent(I_fixed)
-                WAI(dict["ELoad"])"""
+                Sense(configuration["DMM"]).setVoltageRangeDC(
+                    configuration["Range"]
+                )
+            return dmm
+        if model == "3458A":
+            dmm = DMM_3458A(configuration["DMM"])
+            dmm.setDCV(configuration["Range"])
+            dmm.setTriggerArm()
+            dmm.setNPLC(configuration["Aperture"])
+            dmm.setNumberOfReadings()
+            dmm.disableMemory()
+            dmm.setEndCondition()
+            dmm.setDigits()
+            dmm.setAutoZeroMode(configuration["AutoZero"])
+            dmm.enableDisplay()
+            return dmm
+        raise ValueError(f"Unsupported DMM model: {model}")
 
-            sleep(1)
+    @staticmethod
+    def _measure_dmm(configuration, dmm, worker):
+        if configuration["DMM_Model"] == "3458A":
+            return float(dmm.queryMeasurement())
 
-            #Voltage Iteration
-            while j < voltage_iter:
+        dmm.initiate()
+        TRG(configuration["DMM"])
+        while True:
+            execution_checkpoint(worker)
+            status = float(dmm.operationCondition())
+            if status in {512.0, 8192.0, 8704.0}:
+                return float(dmm.instr.query("FETC?"))
+            sleep(0.05)
 
-                #Set Voltage and Current
-                if V > float(dict["maxVoltage"]):
-                    V = float(dict["maxVoltage"])
-                Voltage(dict["PSU"]).setOutputVoltage( V )
-                WAI(dict["PSU"])
-                self.infoList.insert(k, [V, I_fixed, i])
+    @staticmethod
+    def _close_wrapper(instrument):
+        try:
+            if instrument is not None and getattr(instrument, "instr", None) is not None:
+                instrument.instr.close()
+        except Exception:
+            pass
 
-                #Timeout/Delay-----------------------------------------?
-                #Delay(dict["PSU"]).write(dict["UpTime"])
-                #WAI(dict["PSU"])
-                sleep(0.2)
-                sleep(float(self.updatedelay))
+    @staticmethod
+    def _capture_scope_screenshot(
+        oscilloscope,
+        configuration,
+        channel,
+        set_voltage,
+        set_current,
+    ):
+        oscilloscope.run()
+        sleep(1)
+        oscilloscope.stop()
+        image_data = bytes(oscilloscope.read_binary_data())
+        if image_data.startswith(b"#") and len(image_data) >= 2:
+            header_digits = int(image_data[1:2])
+            payload_start = 2 + header_digits
+            image_data = image_data[payload_start:]
 
-                #Readback Voltage and Current
-                temp_values = Measure(dict["PSU"]).multipleChannelQuery(ch,"VOLT")
-                WAI(dict["PSU"])
-                temp_values2 = Measure(dict["PSU"]).multipleChannelQuery(ch,"CURR")
-                WAI(dict["PSU"])
-                sleep(1)
-                self.dataList2.insert(k, [float(temp_values), float(temp_values2)])
-                
-                #INIT DMM (Trigger Measurement)
-                Initiate(dict["DMM"]).initiate()
-                status = float(Status(dict["DMM"]).operationCondition())
-                sleep(1)
-                #print(status)
-                TRG(dict["DMM"])
+        output_directory = Path(configuration["savedir"])
+        output_directory.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S_%f")
+        image_path = output_directory / (
+            f"CH{channel}_{set_voltage:g}V_{set_current:g}A_"
+            f"NO_ELOAD_{timestamp}.png"
+        )
+        image_path.write_bytes(image_data)
+        return image_path
 
-                while 1:
-                    status = float(Status(dict["DMM"]).operationCondition())
-                    
-                    #Measure Voltage with Error Flag Rised
-                    if status == 8704.0:
-                        voltagemeasured = float(Fetch(dict["DMM"]).query())
-                        self.dataList.insert(
-                            
-                            k, [voltagemeasured , 0]
+    def Execute_Voltage_Accuracy_Current_Static(
+        self,
+        configuration,
+        channel,
+        worker=None,
+        capture_oscilloscope=False,
+    ):
+        """Sweep voltage once per loop with no programmed load current."""
+        classes = Dimport.getClasses_Keysight(configuration["Instrument"])
+        Hornbill = classes[20]
+        psu = None
+        dmm = None
+        oscilloscope = None
+        self.infoList = []
+        self.dataList = []
+        self.dataList2 = []
+
+        programming_gain = float(configuration["Programming_Error_Gain"])
+        programming_offset = float(configuration["Programming_Error_Offset"])
+        readback_gain = float(configuration["Readback_Error_Gain"])
+        readback_offset = float(configuration["Readback_Error_Offset"])
+        minimum_voltage = float(configuration["minVoltage"])
+        maximum_voltage = float(configuration["maxVoltage"])
+        voltage_step = float(configuration["voltage_step_size"])
+        updatedelay = float(configuration["updatedelay"])
+        voltage_iterations = math.ceil(
+            ((maximum_voltage - minimum_voltage) / voltage_step) + 1
+        )
+        no_load_current = 0.0
+
+        try:
+            psu = Hornbill(configuration["PSU"])
+            psu.setMode("VOLTAGE", channel)
+            psu.setVoltageSweepPoints(
+                channel,
+                configuration.get(
+                    "SweepPoints", Hornbill.DEFAULT_VOLTAGE_SAMPLE_COUNT
+                ),
+            )
+            psu.senseVoltageSource(configuration["VoltageSense"], channel)
+            psu.sourCurrentLimitPOS("MAXimum", channel)
+            psu.sourCurrentLimitNEG("MINimum", channel)
+            psu.outputState("ON", channel)
+            dmm = HornbillVoltageMeasurementNoELoad._configure_dmm(
+                configuration, classes
+            )
+            if capture_oscilloscope:
+                Oscilloscope = classes[17]
+                oscilloscope = Oscilloscope(configuration["OSC"])
+
+            print(f"Channel {channel} No-ELoad Test Running\n")
+            for point_index in range(voltage_iterations):
+                execution_checkpoint(worker)
+                set_voltage = min(
+                    minimum_voltage + point_index * voltage_step,
+                    maximum_voltage,
+                )
+                psu.sourVoltageLevelImmediateAmplitude(set_voltage, channel)
+                WAI(configuration["PSU"])
+                sleep(updatedelay)
+
+                voltage_monitor, current_monitor, voltage_local = (
+                    _measure_hornbill_readback(psu, configuration, channel)
+                )
+                measured_voltage = HornbillVoltageMeasurementNoELoad._measure_dmm(
+                    configuration, dmm, worker
+                )
+                programming_error = measured_voltage - set_voltage
+                readback_error = voltage_monitor - measured_voltage
+                programming_upper = (
+                    set_voltage * programming_gain + programming_offset
+                )
+                readback_upper = set_voltage * readback_gain + readback_offset
+
+                self.infoList.append(
+                    [set_voltage, no_load_current, point_index]
+                )
+                self.dataList.append([measured_voltage, 0])
+                self.dataList2.append(
+                    [voltage_monitor, current_monitor, voltage_local]
+                )
+
+                if oscilloscope is not None:
+                    execution_checkpoint(worker)
+                    screenshot = (
+                        HornbillVoltageMeasurementNoELoad._capture_scope_screenshot(
+                            oscilloscope,
+                            configuration,
+                            channel,
+                            set_voltage,
+                            no_load_current,
                         )
-                        break
-                    
-                    #Measrue Voltage with Normal Condition
-                    elif status == 512.0:
-                        voltagemeasured = float(Fetch(dict["DMM"]).query())
-                        self.dataList.insert(
-                            
-                            k, [voltagemeasured , 0]
-                        )
-                        break
-                    elif status == 8192.0:
-                        voltagemeasured = float(Fetch(dict["DMM"]).query())
-                        self.dataList.insert(
-                            
-                            k, [voltagemeasured , 0]
-                        )
-                        break
-                WAI(dict["DMM"])
+                    )
+                    print(f"Screenshot saved at: {screenshot}")
 
-                #Increment of Steps
-                #Delay(dict["PSU"]).write(dict["DownTime"])
-                V += float(dict["voltage_step_size"])
-                j += 1
-                k += 1
+                if worker is not None:
+                    programming_percent = _percentage_of_limit(
+                        programming_error, programming_upper
+                    )
+                    readback_percent = _percentage_of_limit(
+                        readback_error, programming_upper
+                    )
+                    worker.new_data.emit(
+                        set_voltage,
+                        no_load_current,
+                        voltage_monitor,
+                        measured_voltage,
+                        current_monitor,
+                        programming_error,
+                        readback_error,
+                        programming_percent,
+                        readback_percent,
+                        programming_upper,
+                        -programming_upper,
+                        readback_upper,
+                        -readback_upper,
+                        100.0,
+                        -100.0,
+                    )
 
-                #Ensure the DUT won't exceed the power limit set
-                powermeasure = float (V * I_fixed)
-                if powermeasure > self.Power:
-                    break
+            return self.infoList, self.dataList, self.dataList2
+        finally:
+            if psu is not None:
+                try:
+                    psu.sourVoltageLevelImmediateAmplitude(0, channel)
+                    psu.sourCurrentLimitPOS("MIN", channel)
+                    psu.outputState("OFF", channel)
+                except Exception:
+                    pass
+            if dmm is not None:
+                try:
+                    RST(configuration["DMM"])
+                except Exception:
+                    pass
+            HornbillVoltageMeasurementNoELoad._close_wrapper(dmm)
+            HornbillVoltageMeasurementNoELoad._close_wrapper(psu)
+            HornbillVoltageMeasurementNoELoad._close_wrapper(oscilloscope)
 
-            I_fixed += float(dict["current_step_size"])
-            i += 1
+    def Execute_Voltage_Accuracy(self, configuration, channel, worker=None):
+        """Backward-compatible entry point for the original no-load script."""
+        return self.Execute_Voltage_Accuracy_Current_Static(
+            configuration, channel, worker=worker
+        )
 
-        Voltage(dict["PSU"]).setOutputVoltage(0)
-        WAI(dict["PSU"])
-        Current(dict["PSU"]).setOutputCurrent("MIN")
-        WAI(dict["PSU"])
-        """Current(dict["ELoad"]).setOutputCurrent(0)
-        WAI(dict["ELoad"])"""
-        Output(dict["PSU"]).SPModeConnection("OFF")
-        WAI(dict["PSU"])
-        Output(dict["PSU"]).setOutputState("OFF")
-        WAI(dict["PSU"])
-        """Output(dict["ELoad"]).setOutputState("OFF")
-        WAI(dict["ELoad"])"""
-        RST(dict["DMM"])
-        WAI(dict["DMM"])
 
-        return self.infoList, self.dataList, self.dataList2
+class HornbillVoltageMeasurementNoELoadWithOscilloscope:
+    """No-load Hornbill voltage sweep with a screenshot at every point."""
+
+    def Execute_Voltage_Accuracy_Current_Static(
+        self, configuration, channel, worker=None
+    ):
+        return HornbillVoltageMeasurementNoELoad.Execute_Voltage_Accuracy_Current_Static(
+            self,
+            configuration,
+            channel,
+            worker=worker,
+            capture_oscilloscope=True,
+        )

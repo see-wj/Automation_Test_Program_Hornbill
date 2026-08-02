@@ -51,6 +51,8 @@ class TestWorker(QThread):
     resume_test = pyqtSignal()
     stop_test = pyqtSignal()
     state_changed = pyqtSignal(str)
+    loop_started = pyqtSignal(int)
+    temperature_data = pyqtSignal(object, int)
     #fail_signal = pyqtSignal(float)     # send error value
     #decision_signal = pyqtSignal(bool)  # receive Continue / Abort
 
@@ -81,6 +83,13 @@ class TestWorker(QThread):
         self.current_executor = CurrentTestExecutor(self, self.report_exporter)
         self.execution_journal = None
         self.temperature_monitor = None
+        self._temperature_thread = None
+        self._temperature_stop_event = threading.Event()
+        self._temperature_loop_index = 0
+        self._temperature_interval = max(
+            0.1,
+            float(self.dict.get("Temperature_Sample_Interval", 1.0)),
+        )
 
     def _set_state(self, state):
         if state == self.state:
@@ -118,6 +127,7 @@ class TestWorker(QThread):
             self._paused = False
             self.was_aborted = True
             self._set_state(TestState.STOPPING)
+            self._temperature_stop_event.set()
             self._control.notify_all()
 
     def checkpoint(self):
@@ -203,20 +213,63 @@ class TestWorker(QThread):
             output_file=output_file,
         )
         self._execute_checkpointed(self.temperature_monitor.configure)
-        self.progress.emit("DAQ973A temperature monitoring enabled")
+        self._temperature_stop_event.clear()
+        self._temperature_thread = threading.Thread(
+            target=self._temperature_monitor_loop,
+            name="DAQ973A-Temperature-Monitor",
+            daemon=True,
+        )
+        self._temperature_thread.start()
+        self.progress.emit(
+            "DAQ973A temperature monitoring enabled "
+            f"({self._temperature_interval:g} s interval)"
+        )
+
+    def _temperature_monitor_loop(self):
+        while not self._temperature_stop_event.is_set():
+            with self._control:
+                while (
+                    self._paused
+                    and not self._stop_requested
+                    and not self._temperature_stop_event.is_set()
+                ):
+                    self._control.wait(timeout=0.1)
+                if self._stop_requested or self._temperature_stop_event.is_set():
+                    return
+                loop_index = self._temperature_loop_index
+
+            try:
+                self._record_temperature(loop_index)
+            except Exception as exception:
+                traceback_text = traceback.format_exc()
+                self.progress.emit(
+                    f"DAQ973A temperature monitoring stopped: {exception}"
+                )
+                self.warning.emit(exception, traceback_text)
+                return
+
+            if self._temperature_stop_event.wait(self._temperature_interval):
+                return
 
     def _record_temperature(self, loop_index):
         if not self.temperature_monitor:
             return
-        sample = self._execute_checkpointed(
-            self.temperature_monitor.measure,
-            loop_index,
-        )
-        self.progress.emit(sample.status_text())
+        sample = self.temperature_monitor.measure(loop_index)
+        self.temperature_data.emit(sample, loop_index)
 
     def _close_temperature_monitor(self):
         if not self.temperature_monitor:
             return
+        self._temperature_stop_event.set()
+        with self._control:
+            self._control.notify_all()
+        if self._temperature_thread is not None:
+            self._temperature_thread.join(timeout=20)
+            if self._temperature_thread.is_alive():
+                self.progress.emit(
+                    "DAQ973A close warning: temperature polling did not stop "
+                    "before the timeout"
+                )
         try:
             try:
                 self.temperature_monitor.close()
@@ -225,6 +278,7 @@ class TestWorker(QThread):
                     f"DAQ973A close warning: {exception}"
                 )
         finally:
+            self._temperature_thread = None
             self.temperature_monitor = None
 
     def _run_dolphin_tests(self, loop_index):
@@ -338,7 +392,7 @@ class TestWorker(QThread):
         instrument_roles = {}
         for role in ("PSU", "DMM", "DMM2", "ELoad", "ACSource", "OSC", "DAQ"):
             address = self.dict.get(role)
-            if address:
+            if address and str(address).strip().lower() != "none":
                 instrument_roles[str(address)] = role
         diagnostic_context = {
             "dut": self.params.get("DUT"),
@@ -368,10 +422,12 @@ class TestWorker(QThread):
                 )
             for x in range(start_loop, int(self.params["noofloop"])):
                 self.checkpoint()
+                with self._control:
+                    self._temperature_loop_index = x
+                self.loop_started.emit(x + 1)
                 #Execute Voltage Measurement for each test checked---------------
                 #Voltage Accuracy Test
                 self._dispatch_dut_tests(x)
-                self._record_temperature(x)
                 if self.force_exit:
                     return
                 if self.execution_journal:

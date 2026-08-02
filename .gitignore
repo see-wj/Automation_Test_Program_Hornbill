@@ -23,7 +23,13 @@ htmlcov/
 /crash_log.txt
 /VOLTAGE_*.xlsx
 /hardware_validation_runs/
+/video_streaming/logs/
+/video_streaming/state/
+/video_streaming/*.key
+/video_streaming/*.crt
+/csv/temperature_measurements.csv
 
 # Local GUI state
+/.update_settings.json
 /Instrument_Config_Files/test_queue.json
 /Instrument_Config_Files/test_queue.json.tmp

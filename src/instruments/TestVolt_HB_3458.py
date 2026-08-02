@@ -39,6 +39,7 @@ class CalWorker(QThread):
     stopped = pyqtSignal()
 
     DMM_RANGES = {"P1": 10, "P2": 100}
+    DMM_LABEL = "3458A"
 
     def __init__(
         self,
@@ -118,6 +119,15 @@ class CalWorker(QThread):
             raise RuntimeError(f"Invalid 3458A reading: {reading!r}") from exception
         return reading
 
+    def _configure_dmm(self, dmm):
+        self._configure_3458a(dmm)
+
+    def _set_dmm_range(self, dmm, dmm_range):
+        self._write(dmm, f"DCV {dmm_range}", delay=0)
+
+    def _measure_dmm(self, dmm):
+        return self._measure_3458a(dmm)
+
     def _validate(self):
         if not self.psu_addr or not self.dmm_addr:
             raise ValueError("PSU and DMM VISA addresses are required")
@@ -132,7 +142,7 @@ class CalWorker(QThread):
         ]
         if unsupported:
             raise ValueError(
-                "3458A voltage calibration supports only P1 and P2"
+                f"{self.DMM_LABEL} voltage calibration supports only P1 and P2"
             )
         self.psu_addr = normalize_visa_address(self.psu_addr)
         self.dmm_addr = normalize_visa_address(self.dmm_addr)
@@ -170,10 +180,16 @@ class CalWorker(QThread):
                 self.log.emit(f"Using connected PSU: {self.psu_addr}")
             psu.timeout = 60000
             if dmm is None:
-                self.log.emit(f"Opening 3458A: {self.dmm_addr}")
-                dmm = self._open_resource(resource_manager, self.dmm_addr, "3458A")
+                self.log.emit(f"Opening {self.DMM_LABEL}: {self.dmm_addr}")
+                dmm = self._open_resource(
+                    resource_manager,
+                    self.dmm_addr,
+                    self.DMM_LABEL,
+                )
             else:
-                self.log.emit(f"Using connected 3458A: {self.dmm_addr}")
+                self.log.emit(
+                    f"Using connected {self.DMM_LABEL}: {self.dmm_addr}"
+                )
             dmm.timeout = 10000
 
             self.log.emit("Enabling Four Wire.")
@@ -189,21 +205,23 @@ class CalWorker(QThread):
             self._write(psu, f"CAL:VOLT 60,(@{self.channel})")
             self._check_psu_error(psu)
 
-            self.log.emit("Configuring 3458A DMM...")
-            self._configure_3458a(dmm)
+            self.log.emit(f"Configuring {self.DMM_LABEL} DMM...")
+            self._configure_dmm(dmm)
             self._wait(0.5)
 
             for point in self.cal_points:
                 dmm_range = self.DMM_RANGES[point]
-                self._write(dmm, f"DCV {dmm_range}", delay=0)
+                self._set_dmm_range(dmm, dmm_range)
                 self.log.emit(f"Selecting calibration level {point}...")
                 self._write(psu, f"CAL:LEV {point}")
                 self._check_psu_error(psu)
                 self._wait(self.settling_delay)
 
-                self.log.emit(f"Measuring {point} with the 3458A...")
-                reading = self._measure_3458a(dmm)
-                self.log.emit(f"3458A reading = {reading}")
+                self.log.emit(
+                    f"Measuring {point} with the {self.DMM_LABEL}..."
+                )
+                reading = self._measure_dmm(dmm)
+                self.log.emit(f"{self.DMM_LABEL} reading = {reading}")
 
                 self.log.emit(f"Writing calibration data for {point}...")
                 self._write(psu, f"CAL:DATA {reading}")
@@ -254,9 +272,15 @@ class CalWorker(QThread):
 
 
 class VoltageCalibrationDialog(QDialog):
+    WORKER_CLASS = CalWorker
+    DMM_LABEL = "3458A"
+    DEFAULT_DMM_ADDRESS = "GPIB0::22::INSTR"
+
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Hornbill Voltage Calibration - 3458A")
+        self.setWindowTitle(
+            f"Hornbill Voltage Calibration - {self.DMM_LABEL}"
+        )
         self.resize(800, 520)
 
         form = QFormLayout()
@@ -264,9 +288,11 @@ class VoltageCalibrationDialog(QDialog):
         self.psu_input.setPlaceholderText("Enter Hornbill PSU VISA address")
         form.addRow("PSU Address:", self.psu_input)
 
-        self.dmm_input = QLineEdit("GPIB0::22::INSTR")
-        self.dmm_input.setPlaceholderText("Enter 3458A VISA address")
-        form.addRow("3458A Address:", self.dmm_input)
+        self.dmm_input = QLineEdit(self.DEFAULT_DMM_ADDRESS)
+        self.dmm_input.setPlaceholderText(
+            f"Enter {self.DMM_LABEL} VISA address"
+        )
+        form.addRow(f"{self.DMM_LABEL} Address:", self.dmm_input)
 
         self.pw_input = QLineEdit("PP8000A")
         self.pw_input.setEchoMode(QLineEdit.Password)
@@ -320,14 +346,15 @@ class VoltageCalibrationDialog(QDialog):
             QMessageBox.warning(
                 self,
                 "Missing Address",
-                "Provide both PSU and 3458A VISA addresses.",
+                f"Provide both PSU and {self.DMM_LABEL} VISA addresses.",
             )
             return
         if [point.upper() for point in points] != ["P1", "P2"]:
             QMessageBox.warning(
                 self,
                 "Invalid Points",
-                "The supported 3458A voltage calibration sequence is P1,P2.",
+                f"The supported {self.DMM_LABEL} voltage calibration "
+                "sequence is P1,P2.",
             )
             return
 
@@ -335,7 +362,7 @@ class VoltageCalibrationDialog(QDialog):
             self,
             "Confirm Calibration",
             "Calibration changes instrument constants. Verify wiring, channel, "
-            "and the 3458A connection before continuing.",
+            f"and the {self.DMM_LABEL} connection before continuing.",
             QMessageBox.Ok | QMessageBox.Cancel,
             QMessageBox.Cancel,
         )
@@ -349,8 +376,16 @@ class VoltageCalibrationDialog(QDialog):
             psu_addr = normalize_visa_address(psu_addr)
             dmm_addr = normalize_visa_address(dmm_addr)
             resource_manager = create_resource_manager()
-            psu = CalWorker._open_resource(resource_manager, psu_addr, "PSU")
-            dmm = CalWorker._open_resource(resource_manager, dmm_addr, "3458A")
+            psu = self.WORKER_CLASS._open_resource(
+                resource_manager,
+                psu_addr,
+                "PSU",
+            )
+            dmm = self.WORKER_CLASS._open_resource(
+                resource_manager,
+                dmm_addr,
+                self.DMM_LABEL,
+            )
         except Exception as exception:
             for instrument in (dmm, psu):
                 if instrument is not None:
@@ -369,9 +404,11 @@ class VoltageCalibrationDialog(QDialog):
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
         self.log.clear()
-        self.append_log("Starting 3458A voltage calibration...")
+        self.append_log(
+            f"Starting {self.DMM_LABEL} voltage calibration..."
+        )
 
-        self.worker = CalWorker(
+        self.worker = self.WORKER_CLASS(
             psu_addr,
             dmm_addr,
             password,

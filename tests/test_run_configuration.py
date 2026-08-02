@@ -50,6 +50,13 @@ class ConfigurationTests(unittest.TestCase):
             "DMM": "DMM",
             "ELoad": "ELoad",
             "DAQ": "USB::DAQ",
+            "ExternalSource": "TCPIP0::SOURCE::INSTR",
+            "External_Source_Positive_Current_Limit": 7,
+            "External_Source_Negative_Current_Limit": -7,
+            "slewrate": 2,
+            "Sinking_Initial_Voltage": 10,
+            "Sinking_Final_Voltage": 20,
+            "Sinking_Voltage_Step_Size": 5,
             "ELoad_Channel": 1,
             "PSU_Channel": [1],
             "VoltageSense": "2-wire",
@@ -59,6 +66,7 @@ class ConfigurationTests(unittest.TestCase):
             "DMM_Model": "DMM",
             "ELoad_Model": "ELoad",
             "Hornbill_Measurement_Command": "SCPI",
+            "SweepPoints": 100000,
             "Relay_Control": "Voltage Relay (Channel 3)",
             "Range": "Auto",
             "Aperture": 1,
@@ -88,6 +96,7 @@ class ConfigurationTests(unittest.TestCase):
 
         self.assertEqual(result["DUT"], "Dolphin")
         self.assertEqual(result["InputZ"], "Auto")
+        self.assertEqual(result["SweepPoints"], 100000)
         self.assertEqual(result["Hornbill_Measurement_Command"], "SCPI")
         self.assertEqual(result["Relay_Control"], "Voltage Relay (Channel 3)")
         self.assertNotIn("DMM2", result)
@@ -114,6 +123,29 @@ class ConfigurationTests(unittest.TestCase):
         result = build_test_parameters(self.parameters, {"Temperature": True})
 
         self.assertEqual(result["DAQ"], "USB::DAQ")
+
+    def test_adds_external_source_fields_for_sinking_test(self):
+        result = build_test_parameters(
+            self.parameters,
+            {"VoltageAccuracy": True, "SinkingTest": True},
+        )
+
+        self.assertEqual(
+            result["ExternalSource"],
+            "TCPIP0::SOURCE::INSTR",
+        )
+        self.assertEqual(
+            result["External_Source_Positive_Current_Limit"],
+            7,
+        )
+        self.assertEqual(
+            result["External_Source_Negative_Current_Limit"],
+            -7,
+        )
+        self.assertEqual(result["slewrate"], 2)
+        self.assertEqual(result["Sinking_Initial_Voltage"], 10)
+        self.assertEqual(result["Sinking_Final_Voltage"], 20)
+        self.assertEqual(result["Sinking_Voltage_Step_Size"], 5)
 
     def test_snapshot_is_independent_from_gui_parameters(self):
         self.parameters["PSU_Channel"] = [1]
