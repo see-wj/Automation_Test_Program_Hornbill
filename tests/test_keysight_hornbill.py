@@ -4,7 +4,14 @@ from unittest.mock import Mock, call, patch
 from DUT_Test_Scripts.Hornbill.Hornbill_DUT_Test_With_ELoad import (
     _measure_hornbill_readback,
 )
-from SCPI_Library.Keysight import DMM_344XXA, DMM_3458A, ELOAD_E367XXA, Hornbill
+from SCPI_Library.Keysight import (
+    DMM_344XXA,
+    DMM_3458A,
+    ELOAD_E367XXA,
+    ELOAD_N3300A,
+    Excavator,
+    Hornbill,
+)
 
 
 class FakeInstrument:
@@ -69,7 +76,7 @@ class HornbillMeasurementTests(unittest.TestCase):
 
         self.assertEqual(
             self.instrument.writes,
-            ["VOLTage:SENSe:SOURce EXT,(@2)"],
+            ["SOURce:VOLTage:SENSe:SOURce EXT,(@2)"],
         )
 
     def test_sample_count_above_instrument_limit_is_rejected(self):
@@ -92,6 +99,43 @@ class HornbillMeasurementTests(unittest.TestCase):
         eload.setOutputCurrent(1.5)
 
         self.assertEqual(self.instrument.writes, ["CURR 1.5"])
+
+    def test_e367xxa_translates_cc_to_current_function(self):
+        eload = ELOAD_E367XXA("USB0::eload::INSTR")
+
+        eload.setMode("CC")
+
+        self.assertEqual(self.instrument.writes, ["FUNCtion CURRent"])
+
+    def test_n3300a_translates_cc_to_current_function(self):
+        eload = ELOAD_N3300A("GPIB1::1::INSTR")
+
+        eload.set_Mode("CC")
+
+        self.assertEqual(
+            self.instrument.writes,
+            ["SOURce:FUNCtion CURR"],
+        )
+
+    def test_excavator_power_study_eload_sequence(self):
+        excavator = Excavator("USB0::excavator::INSTR")
+
+        excavator.clearStatus()
+        excavator.setSYSTEMEMULationMode("ELOAD")
+        excavator.setMode("CURRent")
+        excavator.setOutputCurrent(20)
+        excavator.setOutputState("ON")
+
+        self.assertEqual(
+            self.instrument.writes,
+            [
+                "*CLS",
+                "SYSTem:EMULation ELOAD",
+                "SOURce:FUNCtion CURRent",
+                "SOURce:CURRent:LEVel:IMMediate:AMPLitude 20",
+                "OUTPut:STATe ON",
+            ],
+        )
 
     def test_344xxa_advanced_settings_use_valid_scpi(self):
         dmm = DMM_344XXA("USB0::dmm::INSTR")

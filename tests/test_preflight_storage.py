@@ -39,6 +39,43 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(requirements, {"PSU", "DMM", "ELoad"})
 
+    def test_ac_source_mode_requires_source_and_valid_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parameters = valid_voltage_parameters(directory)
+            parameters.update(
+                AC_Supply_Type="AC Source",
+                ACSource="USB0::AC::INSTR",
+                AC_CurrentLimit=2,
+                AC_VoltageOutput=230,
+                Frequency=50,
+            )
+            errors, requirements = validate_preflight(
+                parameters,
+                {"VoltageAccuracy": True},
+            )
+
+        self.assertEqual(errors, [])
+        self.assertIn("ACSource", requirements)
+
+    def test_plug_mode_rejects_automated_line_regulation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parameters = valid_voltage_parameters(directory)
+            parameters.update(
+                AC_Supply_Type="Plug",
+                V_Rating=30,
+                I_Rating=10,
+                P_Rating=50,
+                Load_Programming_Error_Gain=0,
+                Load_Programming_Error_Offset=0,
+            )
+            errors, requirements = validate_preflight(
+                parameters,
+                {"VoltageLineRegulation": True},
+            )
+
+        self.assertTrue(any("requires AC Supply Type" in error for error in errors))
+        self.assertNotIn("ACSource", requirements)
+
     def test_accepts_hornbill_static_voltage_accuracy_without_eload(self):
         with tempfile.TemporaryDirectory() as directory:
             parameters = valid_voltage_parameters(directory)

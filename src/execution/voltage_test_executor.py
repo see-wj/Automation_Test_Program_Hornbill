@@ -8,9 +8,8 @@ from reporting.data import (
     datatoCSV_OVP_Accuracy,
     datatoCSV_Programming_Response,
 )
-from DUT_Test_Scripts.Dolphin.DUT_Test import NewVoltageMeasurement
+from DUT_Test_Scripts.Dolphin.DUT_Test import LineRegulation, NewVoltageMeasurement
 from DUT_Test_Scripts.Dolphin.Dolphin_DUT_Test_No_ELoad_No_DMM import (
-    LineRegulation,
     NewLoadRegulation,
     OVP_Test,
     ProgrammingResponse,

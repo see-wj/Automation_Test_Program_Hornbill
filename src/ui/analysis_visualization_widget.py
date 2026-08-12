@@ -360,10 +360,26 @@ class AnalysisVisualizationWidget(QWidget):
             return filtered
         channel = self.filter_combos["Channel"].currentData()
         if channel is not None:
-            filtered = filtered.loc[
+            comparison_basis = (
+                filtered["Comparison Basis"].astype(str).str.lower()
+                if "Comparison Basis" in filtered.columns
+                else pd.Series("channel", index=filtered.index)
+            )
+            run_comparison = comparison_basis == "run"
+            channel_match = (
                 (filtered["Channel A"] == channel)
                 | (filtered["Channel B"] == channel)
-            ]
+            )
+            if {"DUT Channel A", "DUT Channel B"}.issubset(filtered.columns):
+                channel_text = str(channel)
+                channel_match = channel_match | (
+                    run_comparison
+                    & (
+                        (filtered["DUT Channel A"].astype(str) == channel_text)
+                        | (filtered["DUT Channel B"].astype(str) == channel_text)
+                    )
+                )
+            filtered = filtered.loc[channel_match]
         return filtered
 
     def _update_cards(self, summary):
@@ -836,12 +852,18 @@ class AnalysisVisualizationWidget(QWidget):
                 & (loops["Metric"] == comparison["Metric"])
             )
             condition = loops.loc[condition_mask]
+            comparison_basis = str(
+                comparison.get("Comparison Basis", "Channel")
+            )
+            comparison_column = (
+                "Run" if comparison_basis.lower() == "run" else "Channel"
+            )
             left = condition.loc[
-                condition["Channel"] == comparison["Channel A"],
+                condition[comparison_column] == comparison["Channel A"],
                 ["Loop", "Mean Error"],
             ].rename(columns={"Mean Error": "Error A"})
             right = condition.loc[
-                condition["Channel"] == comparison["Channel B"],
+                condition[comparison_column] == comparison["Channel B"],
                 ["Loop", "Mean Error"],
             ].rename(columns={"Mean Error": "Error B"})
             matched = left.merge(right, on="Loop").sort_values("Loop")
@@ -850,7 +872,8 @@ class AnalysisVisualizationWidget(QWidget):
             matched["Difference"] = matched["Error A"] - matched["Error B"]
             color = CHANNEL_COLORS[plotted % len(CHANNEL_COLORS)]
             name = (
-                f"Ch {comparison['Channel A']}-{comparison['Channel B']} | "
+                f"{comparison_basis} {comparison['Channel A']}-"
+                f"{comparison['Channel B']} | "
                 f"{comparison['Set Voltage (V)']:.4g} V / "
                 f"{comparison['Set Current (A)']:.4g} A | "
                 f"{str(comparison['Metric']).replace(' Error', '')}"

@@ -43,6 +43,12 @@ class FakeHornbill:
     def sourVoltageLevelImmediateAmplitude(self, value, channel):
         self.commands.append(("voltage", value, channel))
 
+    def sourCurrentLimitPOS(self, value, channel):
+        self.commands.append(("current_limit", value, channel))
+
+    def sourCurrentLimitNEG(self, value, channel):
+        self.commands.append(("current_limit_negative", value, channel))
+
     def outputState(self, state, channel):
         self.commands.append(("output", state, channel))
 
@@ -190,6 +196,8 @@ class NoiseVoltageSweepTests(unittest.TestCase):
             [
                 ("mode", "VOLTAGE", 2),
                 ("voltage", 0, 2),
+                ("current_limit", "MAX", 2),
+                ("current_limit_negative", "MAX", 2),
                 ("output", "ON", 2),
                 ("voltage", 0.8, 2),
                 ("voltage", 0.9, 2),

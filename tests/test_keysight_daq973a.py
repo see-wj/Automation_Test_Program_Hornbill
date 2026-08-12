@@ -1,6 +1,8 @@
 import sys
+import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -62,12 +64,38 @@ class DAQ973ATests(unittest.TestCase):
         self.assertEqual(self.daq.readScan(), [21.1, 22.2, 23.3, 24.4])
         self.assertEqual(self.instrument.queries, ["READ?"])
 
+    def test_uses_extended_timeout_for_multi_channel_scans(self):
+        with patch(
+            "SCPI_Library.Keysight.get_visa_resource",
+            return_value=self.instrument,
+        ) as get_resource:
+            DAQ973A("TCPIP0::DAQ::INSTR")
+
+        get_resource.assert_called_once_with(
+            "TCPIP0::DAQ::INSTR",
+            DAQ973A.DEFAULT_TIMEOUT_MS,
+        )
+
     def test_accepts_single_channel_for_command_checker_preview(self):
         self.daq.configureThermocoupleTemperature(101)
 
         self.assertEqual(
             self.instrument.writes,
             ["CONF:TEMP TC,DEF,(@101)"],
+        )
+
+    def test_configures_internal_dmm_voltage_scan(self):
+        channels = (101, 102, 103, 104)
+
+        self.daq.configureVoltageMeasurement("AUTO", "MIN", channels)
+        self.daq.setScanChannels(channels)
+
+        self.assertEqual(
+            self.instrument.writes,
+            [
+                "CONF:VOLT:DC AUTO,MIN,(@101,102,103,104)",
+                "ROUT:SCAN (@101,102,103,104)",
+            ],
         )
 
 

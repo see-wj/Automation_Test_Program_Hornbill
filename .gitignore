@@ -28,8 +28,11 @@ htmlcov/
 /video_streaming/*.key
 /video_streaming/*.crt
 /csv/temperature_measurements.csv
+/csv/power_study_*.csv
 
 # Local GUI state
 /.update_settings.json
+/.tmp_scope*/
+/.tmp_phase_variants/
 /Instrument_Config_Files/test_queue.json
 /Instrument_Config_Files/test_queue.json.tmp

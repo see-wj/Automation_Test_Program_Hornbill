@@ -7,13 +7,13 @@ from pyvisa.rname import ResourceName
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import (
     QDialog,
+    QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QSpinBox,
     QTextEdit,
     QVBoxLayout,
 )
@@ -52,6 +52,7 @@ class CalWorker(QThread):
         resource_manager_factory=create_resource_manager,
         command_delay=0.2,
         settling_delay=5.0,
+        calibration_time=60.0,
         resource_manager=None,
         psu=None,
         dmm=None,
@@ -60,15 +61,33 @@ class CalWorker(QThread):
         self.psu_addr = psu_addr
         self.dmm_addr = dmm_addr
         self.password = password
-        self.channel = int(channel)
+        self.channels = self._normalize_channels(channel)
+        self.channel = self.channels[0]
         self.cal_points = [point.upper() for point in cal_points]
         self.resource_manager_factory = resource_manager_factory
         self.command_delay = float(command_delay)
         self.settling_delay = float(settling_delay)
+        self.calibration_time = float(calibration_time)
         self.resource_manager = resource_manager
         self.psu = psu
         self.dmm = dmm
         self._stop_requested = threading.Event()
+
+    @staticmethod
+    def _normalize_channels(channels):
+        if isinstance(channels, str):
+            values = [value.strip() for value in channels.split(",") if value.strip()]
+        elif isinstance(channels, (list, tuple, set)):
+            values = list(channels)
+        else:
+            values = [channels]
+
+        normalized = []
+        for value in values:
+            channel = int(value)
+            if channel not in normalized:
+                normalized.append(channel)
+        return normalized
 
     def stop(self):
         self._stop_requested.set()
@@ -86,11 +105,24 @@ class CalWorker(QThread):
         instrument.write(command)
         self._wait(self.command_delay if delay is None else delay)
 
-    def _check_psu_error(self, psu):
-        error = psu.query("SYST:ERR?").strip()
-        if error.startswith("0") or error.startswith("+0"):
-            return
-        raise RuntimeError(f"PSU error: {error}")
+    def _check_psu_error(self, psu, *, retries=3, retry_delay=0.5):
+        last_error = None
+        for attempt in range(retries):
+            self._checkpoint()
+            try:
+                error = psu.query("SYST:ERR?").strip()
+            except Exception as exception:
+                if attempt < retries - 1:
+                    self._wait(retry_delay)
+                    continue
+                raise RuntimeError(f"Unable to read PSU error: {exception}") from exception
+            if error.startswith("0") or error.startswith("+0"):
+                return
+            last_error = error
+            if attempt < retries - 1:
+                self._wait(retry_delay)
+                continue
+        raise RuntimeError(f"PSU error: {last_error}")
 
     def _configure_3458a(self, dmm):
         commands = (
@@ -133,10 +165,17 @@ class CalWorker(QThread):
             raise ValueError("PSU and DMM VISA addresses are required")
         if not self.password:
             raise ValueError("Calibration password is required")
-        if not 1 <= self.channel <= 4:
-            raise ValueError("Calibration channel must be between 1 and 4")
+        if not self.channels:
+            raise ValueError("At least one calibration channel is required")
+        invalid_channels = [
+            channel for channel in self.channels if not 1 <= channel <= 4
+        ]
+        if invalid_channels:
+            raise ValueError("Calibration channels must be between 1 and 4")
         if not self.cal_points:
             raise ValueError("At least one calibration point is required")
+        if self.calibration_time < 0:
+            raise ValueError("Calibration time cannot be negative")
         unsupported = [
             point for point in self.cal_points if point not in self.DMM_RANGES
         ]
@@ -192,41 +231,65 @@ class CalWorker(QThread):
                 )
             dmm.timeout = 10000
 
-            self.log.emit("Enabling Four Wire.")
-            self._write(psu, f"SOURce:VOLTage:SENSe:SOURce EXT, (@{self.channel})")
-            self._write(psu, f"DIAG:POKE 50{self.channel-1}, 2865")
+            self.log.emit("Resetting PSU...")
+            self._write(psu, "*RST")
+            for channel in self.channels:
+                self._write(psu, f"OUTPut:STATe OFF, (@{channel})")
+                self.log.emit(
+                    f"Preparing channel {channel}: 6 V, output ON, four-wire sense..."
+                )
+                self._write(
+                    psu,
+                    f"SOURce:VOLTage:LEVel:IMMediate:AMPLitude 6, (@{channel})",
+                )
+                self._write(psu, f"OUTPut:STATe ON, (@{channel})")
+                self._write(
+                    psu,
+                    f"SOURce:VOLTage:SENSe:SOURce EXT, (@{channel})",
+                )
+                self._write(psu, f"DIAG:POKE 50{channel-1}, 2865")
 
             self.log.emit("Enabling PSU calibration mode...")
             self._write(psu, f'CAL:STAT ON,"{self.password}"')
             calibration_enabled = True
             self._check_psu_error(psu)
-
-            self.log.emit(f"Selecting 60 V calibration on channel {self.channel}...")
-            self._write(psu, f"CAL:VOLT 60,(@{self.channel})")
-            self._check_psu_error(psu)
+            self._wait(2.0)
 
             self.log.emit(f"Configuring {self.DMM_LABEL} DMM...")
             self._configure_dmm(dmm)
             self._wait(0.5)
 
-            for point in self.cal_points:
-                dmm_range = self.DMM_RANGES[point]
-                self._set_dmm_range(dmm, dmm_range)
-                self.log.emit(f"Selecting calibration level {point}...")
-                self._write(psu, f"CAL:LEV {point}")
+            for channel in self.channels:
+                self.log.emit(f"Selecting 60 V calibration on channel {channel}...")
+                self._write(psu, f"CAL:VOLT 60,(@{channel})")
                 self._check_psu_error(psu)
-                self._wait(self.settling_delay)
+                self._wait(2.0)
 
-                self.log.emit(
-                    f"Measuring {point} with the {self.DMM_LABEL}..."
-                )
-                reading = self._measure_dmm(dmm)
-                self.log.emit(f"{self.DMM_LABEL} reading = {reading}")
+                for point in self.cal_points:
+                    dmm_range = self.DMM_RANGES[point]
+                    self._set_dmm_range(dmm, dmm_range)
+                    self.log.emit(
+                        f"Channel {channel}: selecting calibration level {point}..."
+                    )
+                    self._write(psu, f"CAL:LEV {point}")
+                    self._wait(max(self.settling_delay, 2.0))
+                    self._check_psu_error(psu)
+                    self._wait(max(self.settling_delay, 2.0))
 
-                self.log.emit(f"Writing calibration data for {point}...")
-                self._write(psu, f"CAL:DATA {reading}")
-                self._check_psu_error(psu)
-                self._wait(1.0)
+                    self.log.emit(
+                        f"Channel {channel}: measuring {point} with the "
+                        f"{self.DMM_LABEL} after {self.calibration_time:g} s..."
+                    )
+                    self._wait(self.calibration_time)
+                    reading = self._measure_dmm(dmm)
+                    self.log.emit(f"{self.DMM_LABEL} reading = {reading}")
+
+                    self.log.emit(
+                        f"Channel {channel}: writing calibration data for {point}..."
+                    )
+                    self._write(psu, f"CAL:DATA {reading}")
+                    self._check_psu_error(psu)
+                    self._wait(2.0)
 
             self._checkpoint()
             self.log.emit("Saving calibration constants...")
@@ -254,10 +317,13 @@ class CalWorker(QThread):
                         self.log.emit(
                             f"Unable to disable calibration mode: {exception}"
                         )
-                try:
-                    psu.write(f"OUTPUT:STATE OFF,(@{self.channel})")
-                except Exception as exception:
-                    self.log.emit(f"Unable to disable PSU output: {exception}")
+                for channel in self.channels:
+                    try:
+                        psu.write(f"OUTPUT:STATE OFF,(@{channel})")
+                    except Exception as exception:
+                        self.log.emit(
+                            f"Unable to disable PSU channel {channel} output: {exception}"
+                        )
             for instrument in (dmm, psu):
                 if instrument is not None:
                     try:
@@ -298,13 +364,23 @@ class VoltageCalibrationDialog(QDialog):
         self.pw_input.setEchoMode(QLineEdit.Password)
         form.addRow("Calibration Password:", self.pw_input)
 
-        self.channel_input = QSpinBox()
-        self.channel_input.setRange(1, 4)
-        self.channel_input.setValue(1)
-        form.addRow("Channel:", self.channel_input)
+        self.channel_input = QLineEdit("1")
+        self.channel_input.setPlaceholderText("Examples: 1 or 1,2,3,4")
+        form.addRow("Channels (csv):", self.channel_input)
 
         self.points_input = QLineEdit("P1,P2")
         form.addRow("Calibration Points:", self.points_input)
+
+        self.calibration_time_input = QDoubleSpinBox()
+        self.calibration_time_input.setRange(0.0, 3600.0)
+        self.calibration_time_input.setDecimals(1)
+        self.calibration_time_input.setSingleStep(5.0)
+        self.calibration_time_input.setValue(60.0)
+        self.calibration_time_input.setSuffix(" s")
+        self.calibration_time_input.setToolTip(
+            "Wait time after each P1/P2 calibration level before reading the DMM."
+        )
+        form.addRow("Calibration Time:", self.calibration_time_input)
 
         self.start_btn = QPushButton("Start Calibration")
         self.start_btn.clicked.connect(self.on_start)
@@ -335,7 +411,24 @@ class VoltageCalibrationDialog(QDialog):
         psu_addr = self.psu_input.text().strip()
         dmm_addr = self.dmm_input.text().strip()
         password = self.pw_input.text().strip()
-        channel = self.channel_input.value()
+        calibration_time = self.calibration_time_input.value()
+        channel_text = self.channel_input.text().strip()
+        try:
+            channels = self.WORKER_CLASS._normalize_channels(channel_text)
+        except (TypeError, ValueError):
+            QMessageBox.warning(
+                self,
+                "Invalid Channels",
+                "Enter channel numbers from 1 to 4, separated by commas.",
+            )
+            return
+        if not channels or any(channel < 1 or channel > 4 for channel in channels):
+            QMessageBox.warning(
+                self,
+                "Invalid Channels",
+                "Enter at least one channel from 1 to 4.",
+            )
+            return
         points = [
             point.strip()
             for point in self.points_input.text().split(",")
@@ -361,7 +454,8 @@ class VoltageCalibrationDialog(QDialog):
         reply = QMessageBox.warning(
             self,
             "Confirm Calibration",
-            "Calibration changes instrument constants. Verify wiring, channel, "
+            "Calibration changes instrument constants. Verify wiring, channels "
+            f"{', '.join(str(channel) for channel in channels)}, "
             f"and the {self.DMM_LABEL} connection before continuing.",
             QMessageBox.Ok | QMessageBox.Cancel,
             QMessageBox.Cancel,
@@ -412,8 +506,9 @@ class VoltageCalibrationDialog(QDialog):
             psu_addr,
             dmm_addr,
             password,
-            channel,
+            channels,
             points,
+            calibration_time=calibration_time,
             resource_manager=resource_manager,
             psu=psu,
             dmm=dmm,

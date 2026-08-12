@@ -18,6 +18,11 @@ OSC = TCPIP0::a-dx4054a-60122::inst0::INSTR
 DMM2 = USB0::0x2A8D::0x1301::MY53204794::0::INSTR
 ACSource = USB0::0x2A8D::0x3801::LPQ0000103::0::INSTR
 DAQ = USB0::0x2A8D::0x8601::MY59010677::0::INSTR
+PowerStudy_DUT = TCPIP0::p700-95640376::inst0::INSTR
+PowerStudy_ACSource = USB0::0x2A8D::0x1C02::JPFW002748::0::INSTR
+PowerStudy_DAQ = TCPIP0::K-DAQ973A-10677::inst0::INSTR
+PowerStudy_N3300A = GPIB1::1::INSTR
+PowerStudy_Excavator = USB0::0x2A8D::0xDA04::CN24350105::0::INSTR
 ExternalSource =
 // Add optional candidates for the same role with _2, _3, and so on.
 PSU_2 = USB0::0x2A8D::0xDC04::CN24360055::0::INSTR

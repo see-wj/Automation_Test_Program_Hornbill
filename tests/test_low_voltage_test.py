@@ -1,8 +1,10 @@
+import base64
 import csv
 import tempfile
 import unittest
 from pathlib import Path
 
+from openpyxl import load_workbook
 from PyQt5.QtWidgets import QApplication, QLabel
 
 from instruments.LowVoltageTest import (
@@ -46,6 +48,9 @@ class FakeHornbill:
     def sourVoltageLevelImmediateAmplitude(self, value, channel):
         self.commands.append(("voltage", value, channel))
 
+    def senseVoltageSource(self, mode, channel):
+        self.commands.append(("sense", mode, channel))
+
     def diag_POKE_LOW_VOLTAGE_CONTROL(self, channel, point):
         self.commands.append(("poke", channel, point))
 
@@ -55,6 +60,7 @@ class FakeHornbill:
 
 class FakeOscilloscope:
     instances = []
+    image_data = b"#13PNG\n"
 
     def __init__(self, address):
         self.address = address
@@ -73,7 +79,15 @@ class FakeOscilloscope:
 
     def read_binary_data(self):
         self.commands.append("capture")
-        return b"#13PNG\n"
+        return self.image_data
+
+    def measureVMIN(self, channel):
+        self.commands.append(("vmin", channel))
+        return [0.79]
+
+    def measureVMAX(self, channel):
+        self.commands.append(("vmax", channel))
+        return [0.81]
 
 
 class FakeDmmSession(FakeSession):
@@ -151,6 +165,7 @@ class LowVoltageTestTests(unittest.TestCase):
     def setUp(self):
         FakeHornbill.instances.clear()
         FakeOscilloscope.instances.clear()
+        FakeOscilloscope.image_data = b"#13PNG\n"
         FakeDMM344.instances.clear()
         FakeDMM3458.instances.clear()
 
@@ -184,6 +199,8 @@ class LowVoltageTestTests(unittest.TestCase):
             self.assertEqual(100, dialog.increment.value())
             self.assertEqual(3.0, dialog.scope_run_delay.value())
             self.assertEqual("ON", dialog.ink_saver.currentText())
+            self.assertTrue(dialog.scope_vpp_enabled.isChecked())
+            self.assertTrue(dialog.excel_report_enabled.isChecked())
             self.assertFalse(dialog.dmm_enabled.isChecked())
             self.assertFalse(dialog.dmm_address.isEnabled())
         finally:
@@ -245,6 +262,7 @@ class LowVoltageTestTests(unittest.TestCase):
         dut = FakeHornbill.instances[0]
         self.assertEqual(
             [
+                ("sense", "EXT", 1),
                 ("mode", "VOLTAGE", 2),
                 ("voltage", 0, 2),
                 ("output", "ON", 2),
@@ -258,7 +276,7 @@ class LowVoltageTestTests(unittest.TestCase):
             dut.commands,
         )
         self.assertEqual(["SYST:ERR?"] * 5, dut.instr.queries)
-        self.assertEqual(["*CLS"], dut.instr.writes)
+        self.assertEqual([], dut.instr.writes)
         self.assertTrue(dut.instr.closed)
         self.assertTrue(FakeOscilloscope.instances[0].instr.closed)
         self.assertIn(
@@ -270,6 +288,55 @@ class LowVoltageTestTests(unittest.TestCase):
             FakeOscilloscope.instances[0].commands,
         )
         self.assertEqual(100, worker.progress_value.values[-1])
+
+    def test_excel_report_embeds_waveform_and_scope_vpp(self):
+        FakeOscilloscope.image_data = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+            "/x8AAusB9Y9Z4G8AAAAASUVORK5CYII="
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            test = LowVoltageScopeCaptureTest(
+                hornbill_factory=FakeHornbill,
+                oscilloscope_factory=FakeOscilloscope,
+            )
+            test.execute(
+                {
+                    "PSU": "DUT",
+                    "OSC": "SCOPE",
+                    "PSU_Channel": 1,
+                    "LowVoltageInitialPoint": 800,
+                    "LowVoltageFinalPoint": 800,
+                    "OSC_Channel": 4,
+                    "updatedelay": 0,
+                    "ScopeRunCaptureDelay": 0,
+                    "ScopeVppEnabled": True,
+                    "ExcelReportEnabled": True,
+                    "InkSaver": "ON",
+                    "savedir": temporary_directory,
+                }
+            )
+
+            report_path = (
+                Path(temporary_directory)
+                / "low_voltage_scope"
+                / "low_voltage_scope_report_loop_001.xlsx"
+            )
+            workbook = load_workbook(report_path)
+            worksheet = workbook["Low Voltage Capture"]
+
+            self.assertEqual(800, worksheet["C2"].value)
+            self.assertAlmostEqual(0.79, worksheet["E2"].value)
+            self.assertAlmostEqual(0.81, worksheet["F2"].value)
+            self.assertAlmostEqual(20.0, worksheet["G2"].value)
+            self.assertEqual(1, len(worksheet._images))
+            self.assertIn(
+                ("vmin", "CHANNEL4"),
+                FakeOscilloscope.instances[0].commands,
+            )
+            self.assertIn(
+                ("vmax", "CHANNEL4"),
+                FakeOscilloscope.instances[0].commands,
+            )
 
     def test_optional_344xxa_dmm_records_one_measurement_per_image(self):
         worker = FakeWorker()
@@ -372,6 +439,8 @@ class LowVoltageTestTests(unittest.TestCase):
         self.assertTrue(enabled_configuration["DMM_Enabled"])
         self.assertEqual(enabled_configuration["DMM_Model"], "344xxA")
         self.assertEqual(enabled_configuration["LowVoltageIncrement"], 100)
+        self.assertTrue(enabled_configuration["ScopeVppEnabled"])
+        self.assertTrue(enabled_configuration["ExcelReportEnabled"])
 
 
 if __name__ == "__main__":

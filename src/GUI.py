@@ -70,6 +70,8 @@ from common.path import setup_img_folder
 from DUT_Test_Scripts.DUT_screenshot import ScreenShotDialog
 from instruments.LowVoltageTest import LowVoltageTestDialog
 from instruments.NoiseTestVoltageSweep import NoiseVoltageSweepDialog
+from instruments.PowerStudy import PowerStudyDialog
+from instruments.scope_image_ocr import ScopeImageOcrDialog
 from instruments.TemperatureMeasurement import TemperatureMeasurementDialog
 from instruments.TestVolt_HB_34470A import (
     VoltageCalibrationDialog as VoltageCalibration34470ADialog,
@@ -97,6 +99,7 @@ from ui.all_test_dialog import (
     image_Window2,
 )
 from ui.dialog_registry import DialogRegistration, DialogRegistry
+from ui.error_dialogs import show_error_dialog
 from ui.documentation_tab import ProgramDocumentationTab, TestPatternsTab
 from ui.keysight_command_tab import KeysightCommandTab
 from ui.software_update_tab import SoftwareUpdateTab
@@ -150,8 +153,10 @@ class MainWindow(QMainWindow):
         "voltage_calibration_34470a_dialog",
         "low_voltage_test_dialog",
         "noise_voltage_sweep_dialog",
+        "power_study_dialog",
         "temperature_measurement_dialog",
         "waveform_analyzer_dialog",
+        "scope_image_ocr_dialog",
     )
 
     def __init__(self):
@@ -547,6 +552,12 @@ class MainWindow(QMainWindow):
                 NoiseVoltageSweepDialog,
             ),
             DialogRegistration(
+                "Hornbill Four-Channel Power Study",
+                "Run all four 300 W autoranging knee conditions simultaneously",
+                "power_study_dialog",
+                PowerStudyDialog,
+            ),
+            DialogRegistration(
                 "DAQ973A Temperature Measurement",
                 "Acquire thermocouple temperatures and save them to CSV",
                 "temperature_measurement_dialog",
@@ -557,6 +568,12 @@ class MainWindow(QMainWindow):
                 "Load a folder of scope PNG files and highlight abnormal traces",
                 "waveform_analyzer_dialog",
                 WaveformFolderAnalyzerDialog,
+            ),
+            DialogRegistration(
+                "Oscilloscope Image OCR to Excel",
+                "Extract displayed scope measurements from images into one Excel file",
+                "scope_image_ocr_dialog",
+                ScopeImageOcrDialog,
             ),
         )
         return DialogRegistry(registrations, print_console_safe)

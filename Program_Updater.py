@@ -13,6 +13,33 @@ import zipfile
 from pathlib import Path
 
 
+REPLACE_RETRY_TIMEOUT_SECONDS = 60
+REPLACE_RETRY_INTERVAL_SECONDS = 0.5
+
+
+def retry_file_operation(
+    operation,
+    description,
+    timeout=REPLACE_RETRY_TIMEOUT_SECONDS,
+    retry_interval=REPLACE_RETRY_INTERVAL_SECONDS,
+    sleep_fn=time.sleep,
+    monotonic_fn=time.monotonic,
+):
+    deadline = monotonic_fn() + max(0.0, float(timeout))
+    while True:
+        try:
+            return operation()
+        except PermissionError as exception:
+            if monotonic_fn() >= deadline:
+                raise PermissionError(
+                    f"Unable to {description} after {timeout:g} seconds. "
+                    "Close File Explorer windows and other programs using the "
+                    "application folder. If it is inside OneDrive, pause syncing "
+                    "temporarily or install the application outside OneDrive."
+                ) from exception
+            sleep_fn(max(0.0, float(retry_interval)))
+
+
 def wait_for_process(process_id, timeout=120):
     process_id = int(process_id)
     if process_id <= 0:
@@ -93,10 +120,19 @@ def install_update(package_path, target, executable, preserve_paths=()):
             )
 
         if backup_directory.exists():
-            shutil.rmtree(backup_directory)
-        target.rename(backup_directory)
+            retry_file_operation(
+                lambda: shutil.rmtree(backup_directory),
+                f"remove previous backup {backup_directory}",
+            )
+        retry_file_operation(
+            lambda: target.rename(backup_directory),
+            f"move current application {target}",
+        )
         try:
-            prepared_directory.rename(target)
+            retry_file_operation(
+                lambda: prepared_directory.rename(target),
+                f"activate prepared application {target}",
+            )
             for relative_path in preserve_paths:
                 old_path = backup_directory / relative_path
                 new_path = target / relative_path
@@ -112,7 +148,10 @@ def install_update(package_path, target, executable, preserve_paths=()):
         except Exception:
             if target.exists():
                 shutil.rmtree(target, ignore_errors=True)
-            backup_directory.rename(target)
+            retry_file_operation(
+                lambda: backup_directory.rename(target),
+                f"restore previous application {target}",
+            )
             raise
         return backup_directory
     finally:

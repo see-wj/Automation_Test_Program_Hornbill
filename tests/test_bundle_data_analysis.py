@@ -462,6 +462,38 @@ class BundleDataAnalysisTests(unittest.TestCase):
             {"Preliminary"},
         )
 
+    def test_compares_separate_runs_with_the_same_channel_number(self):
+        with tempfile.TemporaryDirectory() as directory:
+            first_root = Path(directory) / "run-a-root"
+            second_root = Path(directory) / "run-b-root"
+            self._write_run(
+                first_root,
+                "run-a",
+                1,
+                ((0.1,),),
+            )
+            self._write_run(
+                second_root,
+                "run-b",
+                1,
+                ((0.2,),),
+            )
+
+            result = analyze_bundle_runs([first_root, second_root])
+
+        self.assertEqual(len(result.channel_comparison), 2)
+        self.assertEqual(
+            set(result.channel_comparison["Comparison Basis"]),
+            {"Run"},
+        )
+        comparison_subjects = (
+            set(result.channel_comparison["Channel A"])
+            | set(result.channel_comparison["Channel B"])
+        )
+        self.assertEqual(comparison_subjects, set(result.observations["Run"]))
+        self.assertEqual(set(result.channel_comparison["DUT Channel A"]), {"1"})
+        self.assertEqual(set(result.channel_comparison["DUT Channel B"]), {"1"})
+
     def test_infers_loop_and_channel_for_legacy_realtime_csv(self):
         with tempfile.TemporaryDirectory() as directory:
             raw = Path(directory) / "legacy-run" / "raw"

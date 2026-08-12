@@ -7,9 +7,8 @@ from reporting.data import (
     datatoCSV_LoadRegulation,
     datatoCSV_OCP_Test,
 )
-from DUT_Test_Scripts.Dolphin.DUT_Test import NewCurrentMeasurement
+from DUT_Test_Scripts.Dolphin.DUT_Test import LineRegulation, NewCurrentMeasurement
 from DUT_Test_Scripts.Dolphin.Dolphin_DUT_Test_No_ELoad_No_DMM import (
-    LineRegulation,
     NewLoadRegulation,
     OCP_Activation_Time,
     PowerMeasurement,

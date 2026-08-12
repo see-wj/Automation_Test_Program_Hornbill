@@ -6,6 +6,9 @@ import threading
 import traceback
 from pathlib import Path
 
+from openpyxl import Workbook
+from openpyxl.drawing.image import Image as ExcelImage
+from openpyxl.styles import Alignment, Font, PatternFill
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import (
     QComboBox,
@@ -35,6 +38,79 @@ DEFAULT_FINAL_POINT = 6000
 
 class LowVoltageTestStopped(RuntimeError):
     pass
+
+
+class LowVoltageExcelReport:
+    HEADERS = (
+        "Loop",
+        "DUT Channel",
+        "DIAG Point",
+        "DMM Voltage (V)",
+        "Scope VMIN (V)",
+        "Scope VMAX (V)",
+        "Scope VPP (mV)",
+        "Screenshot File",
+        "Waveform",
+    )
+
+    def __init__(self, path, configuration):
+        self.path = Path(path)
+        self.workbook = Workbook()
+        self.worksheet = self.workbook.active
+        self.worksheet.title = "Low Voltage Capture"
+        self.worksheet.append(self.HEADERS)
+        self.worksheet.freeze_panes = "A2"
+        self.worksheet.auto_filter.ref = "A1:I1"
+        self.worksheet.row_dimensions[1].height = 24
+        header_fill = PatternFill("solid", fgColor="1F4E78")
+        for cell in self.worksheet[1]:
+            cell.fill = header_fill
+            cell.font = Font(color="FFFFFF", bold=True)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        widths = (10, 14, 14, 18, 16, 16, 16, 48, 58)
+        for column, width in zip("ABCDEFGHI", widths):
+            self.worksheet.column_dimensions[column].width = width
+
+        metadata = self.workbook.create_sheet("Test Settings")
+        metadata.append(("Setting", "Value"))
+        metadata["A1"].font = Font(bold=True, color="FFFFFF")
+        metadata["B1"].font = Font(bold=True, color="FFFFFF")
+        metadata["A1"].fill = header_fill
+        metadata["B1"].fill = header_fill
+        settings = (
+            ("Hornbill Address", configuration.get("PSU", "")),
+            ("Oscilloscope Address", configuration.get("OSC", "")),
+            ("DMM Enabled", bool(configuration.get("DMM_Enabled", False))),
+            ("DMM Model", configuration.get("DMM_Model", "")),
+            ("Initial DIAG Point", configuration.get("LowVoltageInitialPoint", "")),
+            ("Final DIAG Point", configuration.get("LowVoltageFinalPoint", "")),
+            ("DIAG Increment", configuration.get("LowVoltageIncrement", "")),
+            ("DIAG Settling Delay (s)", configuration.get("updatedelay", "")),
+            ("Scope Capture Delay (s)", configuration.get("ScopeRunCaptureDelay", "")),
+            ("Scope VPP Enabled", bool(configuration.get("ScopeVppEnabled", False))),
+            ("Ink Saver", configuration.get("InkSaver", "")),
+        )
+        for setting in settings:
+            metadata.append(setting)
+        metadata.column_dimensions["A"].width = 28
+        metadata.column_dimensions["B"].width = 70
+
+    def append(self, record, image_path):
+        self.worksheet.append(
+            tuple(record.get(header) for header in self.HEADERS[:-1]) + (None,)
+        )
+        row = self.worksheet.max_row
+        self.worksheet.row_dimensions[row].height = 195
+        for cell in self.worksheet[row]:
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
+        image = ExcelImage(str(image_path))
+        image.width = 400
+        image.height = 250
+        self.worksheet.add_image(image, f"I{row}")
+
+    def save(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.workbook.save(self.path)
 
 
 def low_voltage_points(
@@ -190,6 +266,23 @@ class LowVoltageScopeCaptureTest:
         return float(dmm.instr.query("MEAS:VOLT:DC?"))
 
     @staticmethod
+    def _first_numeric_value(value):
+        if isinstance(value, (list, tuple)):
+            if not value:
+                raise RuntimeError("Oscilloscope returned no measurement value")
+            value = value[0]
+        return float(value)
+
+    @classmethod
+    def _measure_scope_voltage(cls, scope, configuration):
+        if not configuration.get("ScopeVppEnabled", False):
+            return None, None, None
+        source = f"CHANNEL{int(configuration['OSC_Channel'])}"
+        minimum = cls._first_numeric_value(scope.measureVMIN(source))
+        maximum = cls._first_numeric_value(scope.measureVMAX(source))
+        return minimum, maximum, (maximum - minimum) * 1000.0
+
+    @staticmethod
     def _output_directory(configuration, worker):
         if worker is not None and worker.run_context is not None:
             root = worker.run_context.storage.charts
@@ -220,6 +313,7 @@ class LowVoltageScopeCaptureTest:
         dmm = None
         measurement_file = None
         measurement_writer = None
+        excel_report = None
         enabled_channels = []
         total = len(points) * len(channels)
         completed = 0
@@ -230,6 +324,14 @@ class LowVoltageScopeCaptureTest:
             scope = self.oscilloscope_factory(configuration["OSC"])
             dmm = self._create_dmm(configuration)
             self._configure_scope(scope, configuration)
+            if configuration.get("ExcelReportEnabled", False):
+                report_path = output_directory / (
+                    f"low_voltage_scope_report_loop_{loop_index + 1:03d}.xlsx"
+                )
+                excel_report = LowVoltageExcelReport(
+                    report_path,
+                    configuration,
+                )
             if dmm is not None:
                 measurement_path = output_directory / (
                     f"low_voltage_dmm_measurements_loop_{loop_index + 1:03d}.csv"
@@ -253,7 +355,8 @@ class LowVoltageScopeCaptureTest:
             for channel in channels:
                 self._checkpoint(worker)
                 diag_channel = diag_channel_selector(channel)
-                dut.instr.write("*CLS")
+                #dut.instr.write("*CLS")
+                dut.senseVoltageSource("EXT", 1)
                 dut.setMode("VOLTAGE", channel)
                 dut.sourVoltageLevelImmediateAmplitude(0, channel)
                 dut.outputState("ON", channel)
@@ -288,6 +391,14 @@ class LowVoltageScopeCaptureTest:
                     scope.run()
                     self._wait(worker, scope_run_delay)
                     scope.stop()
+                    scope_minimum, scope_maximum, scope_vpp = (
+                        self._measure_scope_voltage(scope, configuration)
+                    )
+                    if scope_vpp is not None:
+                        self._emit(
+                            worker,
+                            f"Scope VPP: {scope_vpp:.6g} mV",
+                        )
                     image_data = strip_ieee_binary_block(
                         scope.read_binary_data()
                     )
@@ -297,6 +408,16 @@ class LowVoltageScopeCaptureTest:
                     )
                     image_path.write_bytes(image_data)
                     captured_images.append(image_path)
+                    record = {
+                        "Loop": loop_index + 1,
+                        "DUT Channel": channel,
+                        "DIAG Point": point,
+                        "DMM Voltage (V)": dmm_voltage,
+                        "Scope VMIN (V)": scope_minimum,
+                        "Scope VMAX (V)": scope_maximum,
+                        "Scope VPP (mV)": scope_vpp,
+                        "Screenshot File": str(image_path),
+                    }
                     if measurement_writer is not None:
                         measurement_writer.writerow(
                             {
@@ -308,6 +429,8 @@ class LowVoltageScopeCaptureTest:
                             }
                         )
                         measurement_file.flush()
+                    if excel_report is not None:
+                        excel_report.append(record, image_path)
                     completed += 1
                     if worker is not None:
                         worker.progress_value.emit(
@@ -317,6 +440,12 @@ class LowVoltageScopeCaptureTest:
 
             return tuple(captured_images)
         finally:
+            if excel_report is not None:
+                try:
+                    excel_report.save()
+                    self._emit(worker, f"Excel report saved: {excel_report.path}")
+                except Exception as exception:
+                    self._emit(worker, f"Unable to save Excel report: {exception}")
             if measurement_file is not None:
                 measurement_file.close()
             if scope is not None:
@@ -433,6 +562,14 @@ class LowVoltageTestDialog(QDialog):
             "ON uses the oscilloscope ink-saving hardcopy background; "
             "OFF keeps the normal display colors."
         )
+        self.scope_vpp_enabled = QCheckBox(
+            "Measure oscilloscope VPP using VMAX - VMIN"
+        )
+        self.scope_vpp_enabled.setChecked(True)
+        self.excel_report_enabled = QCheckBox(
+            "Create Excel report with embedded screenshots"
+        )
+        self.excel_report_enabled.setChecked(True)
 
         self.output_directory = QLineEdit()
         browse_button = QPushButton("Browse...")
@@ -455,6 +592,8 @@ class LowVoltageTestDialog(QDialog):
         form.addRow("DIAG Settling Delay:", self.settling_delay)
         form.addRow("Scope Run Capture Delay:", self.scope_run_delay)
         form.addRow("Scope Ink Saver:", self.ink_saver)
+        form.addRow(self.scope_vpp_enabled)
+        form.addRow(self.excel_report_enabled)
         form.addRow("Output Folder:", output_layout)
 
         self.start_button = QPushButton("Start Capture")
@@ -535,6 +674,8 @@ class LowVoltageTestDialog(QDialog):
             "updatedelay": self.settling_delay.value(),
             "ScopeRunCaptureDelay": self.scope_run_delay.value(),
             "InkSaver": self.ink_saver.currentText(),
+            "ScopeVppEnabled": self.scope_vpp_enabled.isChecked(),
+            "ExcelReportEnabled": self.excel_report_enabled.isChecked(),
             "savedir": output_directory,
         }
 
@@ -572,9 +713,14 @@ class LowVoltageTestDialog(QDialog):
             if self.dmm_enabled.isChecked()
             else ""
         )
+        report_note = (
+            " An Excel report with embedded waveforms was generated."
+            if self.excel_report_enabled.isChecked()
+            else ""
+        )
         self.status.setText(
             f"Completed. Captured {len(images)} oscilloscope image(s)."
-            f"{measurement_note}"
+            f"{measurement_note}{report_note}"
         )
 
     def _stopped(self):

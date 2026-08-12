@@ -2,6 +2,13 @@ import math
 import os
 import tempfile
 
+from execution.ac_source_controller import (
+    AC_SOURCE_SUPPLY,
+    PLUG_SUPPLY,
+    SUPPORTED_AC_SUPPLIES,
+    normalized_ac_supply_type,
+)
+
 
 TEST_KEYS = {
     "VoltageAccuracy",
@@ -80,10 +87,7 @@ def required_instruments(checkbox_states, parameters):
     ):
         requirements.add("OSC")
 
-    if (
-        checkbox_states.get("VoltageLineRegulation")
-        or checkbox_states.get("CurrentLineRegulation")
-    ) and parameters.get("AC_Supply_Type") == "AC Source":
+    if selected_tests(checkbox_states) and normalized_ac_supply_type(parameters) == AC_SOURCE_SUPPLY:
         requirements.add("ACSource")
 
     if checkbox_states.get("Temperature"):
@@ -160,6 +164,25 @@ def validate_preflight(parameters, checkbox_states):
     if loop_count is not None and not loop_count.is_integer():
         errors.append("noofloop must be a whole number")
     _number(parameters, "updatedelay", errors, minimum=0)
+
+    ac_supply_type = normalized_ac_supply_type(parameters)
+    if ac_supply_type not in SUPPORTED_AC_SUPPLIES:
+        errors.append(
+            "AC_Supply_Type must be either 'Plug' or 'AC Source'"
+        )
+    line_regulation_selected = (
+        checkbox_states.get("VoltageLineRegulation")
+        or checkbox_states.get("CurrentLineRegulation")
+    )
+    if line_regulation_selected and ac_supply_type == PLUG_SUPPLY:
+        errors.append(
+            "Automated line regulation requires AC Supply Type 'AC Source'; "
+            "Plug mode cannot change the DUT input voltage"
+        )
+    if ac_supply_type == AC_SOURCE_SUPPLY:
+        _number(parameters, "AC_CurrentLimit", errors, positive=True)
+        _number(parameters, "AC_VoltageOutput", errors, positive=True)
+        _number(parameters, "Frequency", errors, positive=True)
 
     if tests & SWEEP_TESTS:
         minimum_voltage = _number(parameters, "minVoltage", errors, minimum=0)

@@ -1316,6 +1316,7 @@ def _comparison_engineering_conclusion(
     difference_detected,
     practical_difference,
     evidence_strength,
+    subject_label="Channel",
 ):
     confidence = {
         "Supported": "High",
@@ -1337,7 +1338,8 @@ def _comparison_engineering_conclusion(
             "meaningful."
         )
         action = (
-            f"Investigate why Channel {channel_a} and Channel {channel_b} "
+            f"Investigate why {subject_label} {channel_a} and "
+            f"{subject_label} {channel_b} "
             "behave differently, then repeat the matched condition."
         )
     elif difference_detected or practical_difference:
@@ -1379,21 +1381,25 @@ def _comparison_engineering_conclusion(
 def _channel_comparison(
     errors,
     practical_difference_threshold_percent,
+    comparison_column="Channel",
+    subject_label="Channel",
 ):
     rows = []
     group_columns = ["DUT", "Test", *CONDITION_COLUMNS, "Metric"]
     for keys, condition in errors.groupby(
         group_columns, dropna=False, sort=False
     ):
-        channels = list(condition["Channel"].drop_duplicates())
-        for channel_a, channel_b in combinations(channels, 2):
+        subjects = list(condition[comparison_column].drop_duplicates())
+        for channel_a, channel_b in combinations(subjects, 2):
+            left_rows = condition.loc[condition[comparison_column] == channel_a]
+            right_rows = condition.loc[condition[comparison_column] == channel_b]
             left = (
-                condition.loc[condition["Channel"] == channel_a]
+                left_rows
                 .groupby("Loop", as_index=False)["Error"]
                 .mean()
             )
             right = (
-                condition.loc[condition["Channel"] == channel_b]
+                right_rows
                 .groupby("Loop", as_index=False)["Error"]
                 .mean()
             )
@@ -1467,16 +1473,16 @@ def _channel_comparison(
                 conclusion = "No meaningful channel offset detected"
             if mean_difference > 0:
                 direction = (
-                    f"Channel {channel_a} error is higher than "
-                    f"Channel {channel_b}"
+                    f"{subject_label} {channel_a} error is higher than "
+                    f"{subject_label} {channel_b}"
                 )
             elif mean_difference < 0:
                 direction = (
-                    f"Channel {channel_a} error is lower than "
-                    f"Channel {channel_b}"
+                    f"{subject_label} {channel_a} error is lower than "
+                    f"{subject_label} {channel_b}"
                 )
             else:
-                direction = "Mean channel errors are equal"
+                direction = f"Mean {subject_label.lower()} errors are equal"
             comparison_priority = (
                 (practical_usage if math.isfinite(practical_usage) else 0.0)
                 + (25.0 if difference_detected else 0.0)
@@ -1498,11 +1504,12 @@ def _channel_comparison(
                 difference_detected,
                 practical_difference,
                 evidence_strength,
+                subject_label,
             )
             comparison_narrative = (
                 f"[{status}] {keys[4]} at {keys[2]:.6g} V / "
-                f"{keys[3]:.6g} A. Channel {channel_a} minus Channel "
-                f"{channel_b}. Finding: {finding} "
+                f"{keys[3]:.6g} A. {subject_label} {channel_a} minus "
+                f"{subject_label} {channel_b}. Finding: {finding} "
                 f"Magnitude: {magnitude} Confidence: {confidence}. "
                 f"Action: {recommended_action} Technical detail: "
                 f"{direction}. Statistical difference: "
@@ -1513,8 +1520,15 @@ def _channel_comparison(
             rows.append(
                 {
                     **dict(zip(group_columns, keys)),
+                    "Comparison Basis": subject_label,
                     "Channel A": channel_a,
                     "Channel B": channel_b,
+                    "DUT Channel A": ", ".join(
+                        str(value) for value in left_rows["Channel"].drop_duplicates()
+                    ),
+                    "DUT Channel B": ", ".join(
+                        str(value) for value in right_rows["Channel"].drop_duplicates()
+                    ),
                     "Matched Loops": int(len(paired)),
                     "Mean Error A": float(paired["Error_A"].mean()),
                     "Mean Error B": float(paired["Error_B"].mean()),
@@ -1575,6 +1589,9 @@ def _comparison_report(channel_comparison):
     preliminary = int(
         (channel_comparison["Evidence Strength"] == "Preliminary").sum()
     )
+    comparison_basis = str(
+        channel_comparison.get("Comparison Basis", pd.Series(["Channel"])).iloc[0]
+    ).lower()
     status_counts = channel_comparison["Status"].value_counts()
     report = [
         "Executive summary: "
@@ -1584,7 +1601,7 @@ def _comparison_report(channel_comparison):
         f"{int(status_counts.get('Insufficient Data', 0))} insufficient-data "
         "matched conditions.",
         f"Compared {total} matched voltage/current/metric conditions.",
-        f"{statistical} conditions showed a statistical channel offset; "
+        f"{statistical} conditions showed a statistical {comparison_basis} offset; "
         f"{practical} reached the practical-difference threshold; "
         f"{both} satisfied both criteria.",
         f"{preliminary} comparison conclusions are preliminary because they "
@@ -2018,9 +2035,13 @@ def analyze_bundle_runs(
         loop_performance,
         stability_summary,
     )
+    roots = _analysis_roots(output_root)
+    compare_separate_runs = len(roots) > 1 and errors["Run"].nunique() > 1
     channel_comparison = _channel_comparison(
         errors,
         practical_difference_threshold_percent,
+        comparison_column="Run" if compare_separate_runs else "Channel",
+        subject_label="Run" if compare_separate_runs else "Channel",
     )
     hypothesis_tests = _hypothesis_assessments(summary)
     extremes = _extremes(errors)

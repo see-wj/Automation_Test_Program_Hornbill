@@ -57,9 +57,7 @@ from execution.preflight import validate_preflight
 from SCPI_Library.instrument_errors import CleanupError, normalize_execution_error
 from SCPI_Library.simulation import is_simulation_mode
 from DUT_Test_Scripts.Dolphin.Dolphin_DUT_Test_No_ELoad_No_DMM import (
-    ActivateAC,
     VisaResourceManager,
-    dictGenerator,
 )
 
 desp_font = QFont("Times New Roman", 14, QFont.Bold)
@@ -2682,12 +2680,24 @@ class AllTestMeasurement(QDialog):
 
     def AC_Supply_Type_changed (self,s):
         self.params.AC_Supply_Type = s
-
-        if self.params.AC_Supply_Type == "AC Source":
+        if s == "AC Source":
             dialogAC = ACSourceSetting(self.params)
-            dialogAC.exec()
-        else:
-            pass
+            if dialogAC.exec() != QDialog.Accepted:
+                self.params.AC_Supply_Type = "Plug"
+                self.QComboBox_AC_Supply_Type.blockSignals(True)
+                self.QComboBox_AC_Supply_Type.setCurrentText("Plug")
+                self.QComboBox_AC_Supply_Type.blockSignals(False)
+        self._update_ac_supply_controls()
+
+    def _update_ac_supply_controls(self):
+        programmable = self.params.AC_Supply_Type == "AC Source"
+        for checkbox in (
+            self.QCheckBox_VoltageLineRegulation_Widget,
+            self.QCheckBox_CurrentLineRegulation_Widget,
+        ):
+            checkbox.setEnabled(programmable)
+            if not programmable:
+                checkbox.setChecked(False)
     
     def Line_Reg_Range_changed (self):
         self.params.Line_Reg_Range = [100,115,230]
@@ -2878,6 +2888,7 @@ class AllTestMeasurement(QDialog):
     def InteractiveAction(self):
         self._update_measurement_mode()
         self._update_test_option_visibility()
+        self._update_ac_supply_controls()
         self._update_save_path_status()
 
     def _update_measurement_mode(self):
@@ -3899,7 +3910,7 @@ class AdvancedSettings(QDialog):
 
 class ACSourceSetting(QDialog):
 
-    """This class is to configure the AC Source Supply to DUT if the selected AC Supply is External."""
+    """Collect AC-source settings without energizing the hardware."""
 
     def __init__(self,parameters):
         super().__init__()
@@ -3908,8 +3919,7 @@ class ACSourceSetting(QDialog):
 
         self.setWindowTitle("AC Source Configuration")
 
-        self.QPushButton_RunAC_Widget = QPushButton()
-        self.QPushButton_RunAC_Widget.setText("Confirm")
+        self.QPushButton_RunAC_Widget = QPushButton("Save Settings")
 
         QLabel_ACSource_VisaAddress = QLabel()
         QLabel_AC_CurrentLimit = QLabel()
@@ -3922,21 +3932,26 @@ class ACSourceSetting(QDialog):
         QLabel_Frequency.setText("AC Frequency Output")
 
         self.QComboBox_ACSource_VisaAddress = QComboBox()
-        self.QLineEdit_AC_CurrentLimit =  QLineEdit()
-        self.QLineEdit_AC_VoltageOutput =  QLineEdit()
-        self.QLineEdit_Frequency =  QLineEdit()
+        self.QLineEdit_AC_CurrentLimit = QLineEdit(str(self.params.AC_CurrentLimit))
+        self.QLineEdit_AC_VoltageOutput = QLineEdit(str(self.params.AC_VoltageOutput))
+        self.QLineEdit_Frequency = QLineEdit(str(self.params.Frequency))
 
         self.QComboBox_ACSource_VisaAddress.clear()
         discovery = GetVisaSCPIResources()
         self.visaIdList = discovery.addresses
         self.nameList = discovery.identities
         instrument_roles = discovery.roles
-        for i in range(len(self.nameList)):
-            self.QComboBox_ACSource_VisaAddress.addItems([str(self.visaIdList[i])])
-        
+        self.QComboBox_ACSource_VisaAddress.addItems(
+            [str(address) for address in self.visaIdList]
+        )
+        configured_address = str(self.params.ACSource or "").strip()
+        if configured_address and configured_address not in self.visaIdList:
+            self.QComboBox_ACSource_VisaAddress.addItem(configured_address)
+
         if 'ACSource' in instrument_roles:
-            AC_index = self.visaIdList.index(instrument_roles['ACSource'])
-            self.QComboBox_ACSource_VisaAddress.setCurrentIndex(AC_index)
+            configured_address = instrument_roles['ACSource']
+        if configured_address:
+            self.QComboBox_ACSource_VisaAddress.setCurrentText(configured_address)
     
         AC_Setting_Widget = QWidget()
         AC_Setting_Layout = QFormLayout(AC_Setting_Widget)
@@ -3950,53 +3965,35 @@ class ACSourceSetting(QDialog):
         Main_Layout.addWidget(AC_Setting_Widget)
         self.setLayout(Main_Layout)
         
-        self.QComboBox_ACSource_VisaAddress.currentTextChanged.connect(self.ACSource_VisaAddress_changed)
-        self.QLineEdit_AC_CurrentLimit.textEdited.connect(self.AC_CurrentLimit_changed)
-        self.QLineEdit_AC_VoltageOutput.textEdited.connect(self.AC_VoltageOutput_changed)
-        self.QLineEdit_Frequency.textEdited.connect(self.Frequency_changed) 
+        self.QPushButton_RunAC_Widget.clicked.connect(self.save_settings)
 
-        self.QPushButton_RunAC_Widget.clicked.connect(self.ActivateACPower)
-
-
-    def ACSource_VisaAddress_changed (self,s):
-        self.params.ACSource = s
-        print_console_safe(self.params.ACSource)
-
-    def AC_CurrentLimit_changed (self,s):
-        self.params.AC_CurrentLimit = s
-        print_console_safe(self.params.AC_CurrentLimit)
-
-    def AC_VoltageOutput_changed (self,s):
-        self.params.AC_VoltageOutput = s
-        print_console_safe(self.params.AC_VoltageOutput)
-    
-    def Frequency_changed (self,s):
-        self.params.Frequency = s
-        print_console_safe(self.params.Frequency)
-
-    def ActivateACPower(self):
-        global globalvv
-        params ={
-            "Instrument": "Keysight",
-            "ACSource": self.params.ACSource,
-            "AC_CurrentLimit": self.params.AC_CurrentLimit,
-            "AC_VoltageOutput": self.params.AC_VoltageOutput,
-            "Frequency": self.params.Frequency,
-        }
-        dict = dictGenerator.input(**params)
-
-        A = VisaResourceManager()
-        flag, args = A.openRM(self.params.ACSource)
-        if flag == 0:
-            string = ""
-            for item in args:
-                string = string + item
-
-            QMessageBox.warning(self, "VISA IO ERROR", string)
+    def save_settings(self):
+        address = self.QComboBox_ACSource_VisaAddress.currentText().strip()
+        if not address:
+            QMessageBox.warning(self, "AC Source", "Select an AC source VISA address")
             return
-        try:
-            ActivateAC.PowerStart(self, dict)
-            super.accept()
-        except Exception as e:
-            QMessageBox.warning(self, "Error", str(e))
-            return
+        values = {}
+        for name, field in (
+            ("current limit", self.QLineEdit_AC_CurrentLimit),
+            ("output voltage", self.QLineEdit_AC_VoltageOutput),
+            ("frequency", self.QLineEdit_Frequency),
+        ):
+            try:
+                value = float(field.text())
+            except ValueError:
+                QMessageBox.warning(self, "AC Source", f"{name.title()} must be numeric")
+                return
+            if value <= 0:
+                QMessageBox.warning(
+                    self,
+                    "AC Source",
+                    f"{name.title()} must be greater than zero",
+                )
+                return
+            values[name] = value
+
+        self.params.ACSource = address
+        self.params.AC_CurrentLimit = values["current limit"]
+        self.params.AC_VoltageOutput = values["output voltage"]
+        self.params.Frequency = values["frequency"]
+        self.accept()

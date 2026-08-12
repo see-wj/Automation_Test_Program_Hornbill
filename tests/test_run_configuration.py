@@ -74,6 +74,12 @@ class ConfigurationTests(unittest.TestCase):
             "inputZ": "Auto",
             "UpTime": 0,
             "DownTime": 0,
+            "AC_Supply_Type": "Plug",
+            "ACSource": "USB0::AC::INSTR",
+            "AC_CurrentLimit": 2,
+            "AC_VoltageOutput": 230,
+            "Frequency": 50,
+            "Line_Reg_Range": [100, 115, 230],
             "rshunt": 0.1,
             "DMM2": "DMM2",
             "OSC": "OSC",
@@ -99,7 +105,31 @@ class ConfigurationTests(unittest.TestCase):
         self.assertEqual(result["SweepPoints"], 100000)
         self.assertEqual(result["Hornbill_Measurement_Command"], "SCPI")
         self.assertEqual(result["Relay_Control"], "Voltage Relay (Channel 3)")
+        self.assertEqual(result["AC_Supply_Type"], "Plug")
+        self.assertNotIn("ACSource", result)
         self.assertNotIn("DMM2", result)
+
+    def test_adds_ac_source_fields_when_programmable_source_selected(self):
+        self.parameters["AC_Supply_Type"] = "AC Source"
+
+        result = build_test_parameters(
+            self.parameters,
+            {"VoltageAccuracy": True},
+        )
+
+        self.assertEqual(result["ACSource"], "USB0::AC::INSTR")
+        self.assertEqual(result["AC_CurrentLimit"], 2)
+        self.assertEqual(result["AC_VoltageOutput"], 230)
+        self.assertEqual(result["Frequency"], 50)
+
+    def test_line_regulation_adds_range_but_plug_does_not_add_address(self):
+        result = build_test_parameters(
+            self.parameters,
+            {"VoltageLineRegulation": True},
+        )
+
+        self.assertEqual(result["Line_Reg_Range"], [100, 115, 230])
+        self.assertNotIn("ACSource", result)
 
     def test_adds_current_only_fields(self):
         result = build_test_parameters(self.parameters, {"Current_Test": True})

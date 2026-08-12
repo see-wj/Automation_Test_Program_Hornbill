@@ -5,7 +5,11 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from Program_Updater import install_update, safe_extract
+from Program_Updater import (
+    install_update,
+    retry_file_operation,
+    safe_extract,
+)
 from updater.update_service import (
     ApplicationUpdateService,
     is_newer_version,
@@ -13,10 +17,41 @@ from updater.update_service import (
 
 
 class SoftwareUpdateTests(unittest.TestCase):
+    def test_retries_temporary_windows_folder_lock(self):
+        attempts = []
+        clock = [0.0]
+
+        def operation():
+            attempts.append(clock[0])
+            if len(attempts) < 3:
+                raise PermissionError(32, "file is being used")
+            return "renamed"
+
+        def sleep(seconds):
+            clock[0] += seconds
+
+        result = retry_file_operation(
+            operation,
+            "move test application",
+            timeout=5,
+            retry_interval=0.5,
+            sleep_fn=sleep,
+            monotonic_fn=lambda: clock[0],
+        )
+
+        self.assertEqual(result, "renamed")
+        self.assertEqual(len(attempts), 3)
+
     def test_version_comparison_supports_release_versions(self):
         self.assertTrue(is_newer_version("1.2.0", "1.1.9"))
         self.assertFalse(is_newer_version("1.2.0", "1.2.0"))
         self.assertTrue(is_newer_version("1.2.0", "1.2.0-rc1"))
+        self.assertTrue(
+            is_newer_version(
+                "1.2.0.20260810.153045",
+                "1.2.0.20260806.145000",
+            )
+        )
 
     def test_checks_relative_manifest_and_stages_verified_package(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -8,6 +8,7 @@ from time import monotonic as monotonic_time
 from PyQt5.QtCore import QThread, pyqtSignal
 
 from execution.current_test_executor import CurrentTestExecutor
+from execution.ac_source_controller import ACSourceController, uses_ac_source
 from DUT_Test_Scripts.execution_control import clear_execution_worker, set_execution_worker
 from DUT_Test_Scripts.instrument_shutdown import shutdown_instruments
 from SCPI_Library.instrument_errors import (
@@ -83,6 +84,7 @@ class TestWorker(QThread):
         self.current_executor = CurrentTestExecutor(self, self.report_exporter)
         self.execution_journal = None
         self.temperature_monitor = None
+        self.ac_source_controller = None
         self._temperature_thread = None
         self._temperature_stop_event = threading.Event()
         self._temperature_loop_index = 0
@@ -224,6 +226,30 @@ class TestWorker(QThread):
             "DAQ973A temperature monitoring enabled "
             f"({self._temperature_interval:g} s interval)"
         )
+
+    def _start_ac_supply(self):
+        if not uses_ac_source(self.dict):
+            self.progress.emit("AC supply mode: Plug (no programmable AC source)")
+            return
+        self.ac_source_controller = ACSourceController(self.dict)
+        self._execute_checkpointed(self.ac_source_controller.start)
+        self.progress.emit(
+            "AC source enabled: "
+            f"{float(self.dict['AC_VoltageOutput']):g} V, "
+            f"{float(self.dict['Frequency']):g} Hz, "
+            f"{float(self.dict['AC_CurrentLimit']):g} A limit"
+        )
+
+    def _close_ac_supply(self):
+        if self.ac_source_controller is None:
+            return
+        try:
+            self.ac_source_controller.stop()
+            self.progress.emit("AC source output disabled")
+        except Exception as exception:
+            self.progress.emit(f"AC source shutdown warning: {exception}")
+        finally:
+            self.ac_source_controller = None
 
     def _temperature_monitor_loop(self):
         while not self._temperature_stop_event.is_set():
@@ -410,6 +436,7 @@ class TestWorker(QThread):
                     self.params.get("resume_run_directory"),
                 )
             begin_visa_session_scope()
+            self._start_ac_supply()
             self._start_temperature_monitor()
             start_loop = (
                 self.execution_journal.next_loop_index
@@ -454,6 +481,7 @@ class TestWorker(QThread):
             self.error.emit(normalized_error, tb)
         finally:
             self._close_temperature_monitor()
+            self._close_ac_supply()
             self.close_visa_sessions()
             self.safe_shutdown()
             clear_execution_worker()

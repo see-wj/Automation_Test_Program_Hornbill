@@ -29,6 +29,7 @@ from DUT_Test_Scripts.scpi_runtime import (
     VisaResourceManager,
     execution_checkpoint as _execution_checkpoint,
 )
+from execution.ac_source_controller import set_ac_source_voltage
 
 ######################################################################
 class NewVoltageMeasurement:
@@ -4580,7 +4581,7 @@ class LineRegulation:
             AC_HighLine = round(float(i) * 1.1,1)
             print(float(i))
 
-            Voltage(dict["ACSource"]).setOutputVoltage(float(i))
+            set_ac_source_voltage(dict, float(i))
             WAI(dict["ACSource"])
             sleep(5)
             
@@ -4674,7 +4675,7 @@ class LineRegulation:
                 sleep(1)
 
                 #Low Line Reading
-                Voltage(dict["ACSource"]).setOutputVoltage(AC_LowLine)
+                set_ac_source_voltage(dict, AC_LowLine)
                 WAI(dict["ACSource"])
                 sleep(3)
                 Initiate(dict["DMM"]).initiate()
@@ -4683,7 +4684,7 @@ class LineRegulation:
                 sleep(1)
 
                 #High Line Reading
-                Voltage(dict["ACSource"]).setOutputVoltage(AC_HighLine)
+                set_ac_source_voltage(dict, AC_HighLine)
                 WAI(dict["ACSource"])
                 sleep(3)
                 Initiate(dict["DMM"]).initiate()
@@ -4702,7 +4703,7 @@ class LineRegulation:
                 V_Max = round(self.powerfin / self.currentmax,2)        #Voltage based on Imax and Power Test
                 
                 #PSU ON, ELoad OFF
-                Voltage(dict["ACSource"]).setOutputVoltage(AC_Voltage_Nominal)
+                set_ac_source_voltage(dict, float(i))
                 WAI(dict["ACSource"])
                 Current(dict["PSU"]).setOutputCurrent("MAX")
                 WAI(dict["PSU"])
@@ -4744,7 +4745,7 @@ class LineRegulation:
                 sleep(1)
 
                 #Low Line Reading
-                Voltage(dict["ACSource"]).setOutputVoltage(AC_LowLine)
+                set_ac_source_voltage(dict, AC_LowLine)
                 WAI(dict["ACSource"])
                 sleep(3)
                 Initiate(dict["DMM"]).initiate()
@@ -4753,7 +4754,7 @@ class LineRegulation:
                 sleep(1)
 
                 #High Line Reading
-                Voltage(dict["ACSource"]).setOutputVoltage(AC_HighLine)
+                set_ac_source_voltage(dict, AC_HighLine)
                 WAI(dict["ACSource"])
                 sleep(3)
                 Initiate(dict["DMM"]).initiate()
@@ -4804,7 +4805,7 @@ class LineRegulation:
         WAI(dict["PSU"])
         Current(dict["ELoad"]).setOutputCurrent(0)
         WAI(dict["ELoad"])
-        Voltage(dict["ACSource"]).setOutputVoltage(230)
+        set_ac_source_voltage(dict, dict["AC_VoltageOutput"])
         WAI(dict["ACSource"])
         #Output(dict["ACSource"]).setOutputState("OFF")
         #WAI(dict["ACSource"])
@@ -4910,7 +4911,7 @@ class LineRegulation:
             AC_HighLine = round(float(i) * 1.1,1)
             print(float(i))
             
-            Voltage(dict["ACSource"]).setOutputVoltage(float(i))
+            set_ac_source_voltage(dict, float(i))
             WAI(dict["ACSource"])
             sleep(5)
 
@@ -5007,7 +5008,7 @@ class LineRegulation:
                 sleep(1)
 
                 #Low Line Reading
-                Voltage(dict["ACSource"]).setOutputVoltage(AC_LowLine)
+                set_ac_source_voltage(dict, AC_LowLine)
                 WAI(dict["ACSource"])
                 sleep(3)
                 Initiate(dict["DMM2"]).initiate()
@@ -5016,7 +5017,7 @@ class LineRegulation:
                 sleep(1)
 
                 #High Line Reading
-                Voltage(dict["ACSource"]).setOutputVoltage(AC_HighLine)
+                set_ac_source_voltage(dict, AC_HighLine)
                 WAI(dict["ACSource"])
                 sleep(3)
                 Initiate(dict["DMM2"]).initiate()
@@ -5037,7 +5038,7 @@ class LineRegulation:
 
                 I_Max = round(self.powerfin / self.voltagemax, 2)
 
-                Voltage(dict["ACSource"]).setOutputVoltage(AC_Voltage_Nominal)
+                set_ac_source_voltage(dict, float(i))
                 WAI(dict["ACSource"])
                 Voltage(dict["PSU"]).setOutputVoltage("MAX") 
                 WAI(dict["PSU"])
@@ -5058,7 +5059,7 @@ class LineRegulation:
                 sleep(1)
 
                 #Low Line Reading
-                Voltage(dict["ACSource"]).setOutputVoltage(AC_LowLine)
+                set_ac_source_voltage(dict, AC_LowLine)
                 WAI(dict["ACSource"])
                 sleep(3)
                 Initiate(dict["DMM2"]).initiate()
@@ -5067,7 +5068,7 @@ class LineRegulation:
                 sleep(1)
 
                 #High Line Reading
-                Voltage(dict["ACSource"]).setOutputVoltage(AC_HighLine)
+                set_ac_source_voltage(dict, AC_HighLine)
                 WAI(dict["ACSource"])
                 sleep(3)
                 Initiate(dict["DMM2"]).initiate()
@@ -5113,7 +5114,7 @@ class LineRegulation:
         WAI(dict["PSU"])
         Voltage(dict["ELoad"]).setOutputVoltage(0)
         WAI(dict["ELoad"])
-        Voltage(dict["ACSource"]).setOutputVoltage(230)     # Maintain AC Source RUNNING
+        set_ac_source_voltage(dict, dict["AC_VoltageOutput"])
         WAI(dict["ACSource"])
         Output(dict["PSU"]).setOutputState("OFF")
         WAI(dict["PSU"])

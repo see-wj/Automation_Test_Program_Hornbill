@@ -68,6 +68,7 @@ class HornbillVoltageCalibrationTests(unittest.TestCase):
             resource_manager_factory=lambda: resource_manager,
             command_delay=0,
             settling_delay=0,
+            calibration_time=0,
         )
 
     def test_3458a_sequence_saves_both_calibration_points(self):
@@ -124,6 +125,50 @@ class HornbillVoltageCalibrationTests(unittest.TestCase):
         self.assertEqual(psu_writes[-1], "OUTPUT:STATE OFF,(@1)")
         self.assertNotIn("CAL:SAVE", psu_writes)
 
+    def test_multiple_channels_are_calibrated_before_single_save(self):
+        psu = FakeInstrument()
+        dmm = FakeInstrument(["1.1", "59.1", "1.2", "59.2"])
+        resource_manager = FakeResourceManager({
+            "TCPIP0::PSU::inst0::INSTR": psu,
+            "GPIB0::22::INSTR": dmm,
+        })
+        worker = CalWorker(
+            "TCPIP0::PSU::INSTR",
+            "GPIB0::22",
+            "PP8000A",
+            [1, 2],
+            ["P1", "P2"],
+            resource_manager_factory=lambda: resource_manager,
+            command_delay=0,
+            settling_delay=0,
+            calibration_time=0,
+        )
+        errors = []
+        worker.error.connect(errors.append)
+
+        worker.run()
+
+        self.assertEqual(errors, [])
+        psu_writes = [command for operation, command in psu.commands if operation == "write"]
+        channel_1_index = psu_writes.index("CAL:VOLT 60,(@1)")
+        channel_2_index = psu_writes.index("CAL:VOLT 60,(@2)")
+        save_index = psu_writes.index("CAL:SAVE")
+        self.assertLess(channel_1_index, channel_2_index)
+        self.assertLess(channel_2_index, save_index)
+        self.assertEqual(psu_writes.count('CAL:STAT ON,"PP8000A"'), 1)
+        self.assertEqual(psu_writes.count("CAL:SAVE"), 1)
+        self.assertEqual(psu_writes.count("CAL:STAT OFF"), 1)
+        self.assertEqual(psu_writes.count("CAL:LEV P1"), 2)
+        self.assertEqual(psu_writes.count("CAL:LEV P2"), 2)
+        self.assertIn("CAL:DATA 1.1", psu_writes)
+        self.assertIn("CAL:DATA 59.1", psu_writes)
+        self.assertIn("CAL:DATA 1.2", psu_writes)
+        self.assertIn("CAL:DATA 59.2", psu_writes)
+        self.assertEqual(psu_writes[-2:], [
+            "OUTPUT:STATE OFF,(@1)",
+            "OUTPUT:STATE OFF,(@2)",
+        ])
+
     def test_34470a_sequence_uses_modern_scpi_and_saves_both_points(self):
         psu = FakeInstrument()
         dmm = FakeInstrument(["1.23456789", "59.8765432"])
@@ -141,6 +186,7 @@ class HornbillVoltageCalibrationTests(unittest.TestCase):
             resource_manager_factory=lambda: resource_manager,
             command_delay=0,
             settling_delay=0,
+            calibration_time=0,
         )
         errors = []
         worker.error.connect(errors.append)
@@ -187,6 +233,7 @@ class HornbillVoltageCalibrationTests(unittest.TestCase):
             ["P1", "P2"],
             command_delay=0,
             settling_delay=0,
+            calibration_time=0,
             resource_manager=resource_manager,
             psu=psu,
             dmm=dmm,
@@ -241,8 +288,10 @@ class HornbillVoltageCalibrationTests(unittest.TestCase):
                 "Voltage Calibration - 34470A",
                 "Hornbill Low Voltage Scope Capture",
                 "Hornbill Noise Test Voltage Sweep",
+                "Hornbill Four-Channel Power Study",
                 "DAQ973A Temperature Measurement",
                 "Waveform Image Anomaly Analyzer",
+                "Oscilloscope Image OCR to Excel",
             ],
         )
 

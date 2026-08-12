@@ -1025,8 +1025,16 @@ class Excavator(Subsystem):
         super().__init__(VISA_ADDRESS)
 
     def setSYSTEMEMULationMode(self, mode):
+        #Syntax:SOURce|ELOAD
         self.instr.write(f"SYSTem:EMULation {mode}")
 
+    def setMode(self, mode):
+        #Syntax: <CURRent|VOLTage|POWer|RESistance|CVCC|CRCC|CVCR|AUTO>
+        self.instr.write(f"SOURce:FUNCtion {mode}")
+
+    def setOutputCurrent(self, value):
+        self.instr.write(f"SOURce:CURRent:LEVel:IMMediate:AMPLitude {value}")
+    
     def setPOSCurrentLimit(self, value):
         self.instr.write(f"SOURce:CURRent:LIMit:POSitive {value}")
 
@@ -1038,6 +1046,12 @@ class Excavator(Subsystem):
 
     def setOutputState(self, state):
         self.instr.write(f"OUTPut:STATe {state}")
+
+    def clearStatus(self):
+        self.instr.write("*CLS")
+
+    def queryError(self):
+        return self.instr.query("SYST:ERR?")
 
 class Hornbill(Subsystem):
     """Child Class for Hornbill Subsystem"""
@@ -1061,6 +1075,12 @@ class Hornbill(Subsystem):
 
     def __init__(self, VISA_ADDRESS):
         super().__init__(VISA_ADDRESS)
+
+    def clearStatus(self):
+        self.instr.write("*CLS")
+
+    def queryError(self):
+        return self.instr.query("SYST:ERR?")
     
     def setMode(self, Mode, ChannelNumber):
         self.instr.write(f"FUNC {Mode},(@{ChannelNumber})")
@@ -1270,6 +1290,9 @@ class SMU_N67XX(Subsystem):
 
     def setRange (self, Mode, Value):
         self.instr.write(f"SOURce:{Mode}:RANGe {Value}")
+
+
+SMU = SMU_N67XX
 
 class Oscilloscope(Subsystem):
     """Child Class for Oscilloscope Subsystem"""
@@ -1487,6 +1510,14 @@ class DMM_3458A(Subsystem):
 class DAQ973A(Subsystem):
     """SCPI commands for DAQ973A thermocouple temperature measurements."""
 
+    DEFAULT_TIMEOUT_MS = 120000
+
+    def __init__(self, VISA_ADDRESS, timeout=None):
+        super().__init__(
+            VISA_ADDRESS,
+            self.DEFAULT_TIMEOUT_MS if timeout is None else timeout,
+        )
+
     @staticmethod
     def _channel_list(channels):
         if isinstance(channels, str):
@@ -1507,6 +1538,9 @@ class DAQ973A(Subsystem):
 
     def reset(self):
         self.instr.write("*RST")
+
+    def configureVoltageMeasurement(self, range, resolution, channels):
+        self.instr.write(f"CONF:VOLT:DC {range},{resolution},{self._channel_list(channels)}")
 
     def configureThermocoupleTemperature(self, channels):
         self.instr.write(f"CONF:TEMP TC,DEF,{self._channel_list(channels)}")
@@ -1532,6 +1566,15 @@ class DAQ973A(Subsystem):
 
     def setScanChannels(self, channels):
         self.instr.write(f"ROUT:SCAN {self._channel_list(channels)}")
+
+    def openAllChannels(self):
+        self.instr.write("ROUT:OPEN:ALL")
+
+    def routeChannel(self, channel):
+        self.instr.write(f"ROUT:CLOS {self._channel_list(channel)}")
+
+    def openChannel(self, channel):
+        self.instr.write(f"ROUT:OPEN {self._channel_list(channel)}")
 
     def readScan(self):
         response = self.instr.query("READ?")
@@ -1574,6 +1617,15 @@ class DMM_344XXA(Subsystem):
     def setAutoImpedanceMode(self, mode):
         self.instr.write(f"SENSe:VOLTage:DC:IMPedance:AUTO {mode}")
 
+    def measureVoltageDC(self):
+        return float(str(self.instr.query("MEAS:VOLT:DC?")).strip())
+
+    def clearStatus(self):
+        self.instr.write("*CLS")
+
+    def queryError(self):
+        return self.instr.query("SYST:ERR?")
+
 class ELOAD_E367XXA(Subsystem):
     """Child Class for ELOAD_E367XXA Subsystem"""
 
@@ -1581,7 +1633,14 @@ class ELOAD_E367XXA(Subsystem):
         super().__init__(VISA_ADDRESS)
 
     def setMode(self, mode):
-        self.instr.write(f"FUNC {mode}")
+        normalized_mode = str(mode).strip().upper()
+        mode_aliases = {
+            "CC": "CURRent",
+            "CURRENT": "CURRent",
+            "CV": "VOLTage",
+            "VOLTAGE": "VOLTage",
+        }
+        self.instr.write(f"FUNCtion {mode_aliases.get(normalized_mode, mode)}")
     
     def setOutputCurrent(self, value):
         try:
@@ -1603,6 +1662,12 @@ class ELOAD_E367XXA(Subsystem):
     
     def setOutputState(self, state):
         self.instr.write(f"OUTP {state}")
+
+    def clearStatus(self):
+        self.instr.write("*CLS")
+
+    def queryError(self):
+        return self.instr.query("SYST:ERR?")
 
     def setEmulationMode(self, mode):
         self.instr.write(f":SOURce:EMULation {mode}")
@@ -1654,4 +1719,85 @@ class ELOAD_E363XXA(Subsystem):
 
     def setFunction(self, mode, ChannelNumber):
         self.instr.write(f":FUNCtion {mode},(@{ChannelNumber})")
-SMU = SMU_N67XX
+
+class ELOAD_N3300A(Subsystem):
+    """Child Class for ELOAD_N3300A Subsystem"""
+
+    def __init__(self, VISA_ADDRESS):
+        super().__init__(VISA_ADDRESS)
+
+    def set_SelectChannel(self, channel):
+        self.instr.write(f"CHANnel:LOAD {channel}")
+
+    def set_Mode(self, mode):
+        normalized_mode = str(mode).strip().upper()
+        mode_aliases = {
+            "CC": "CURR",
+            "CURRENT": "CURR",
+            "CV": "VOLT",
+            "VOLTAGE": "VOLT",
+            "CR": "RES",
+            "RESISTANCE": "RES",
+        }
+        command_mode = mode_aliases.get(normalized_mode, normalized_mode)
+        self.instr.write(f"SOURce:FUNCtion {command_mode}")
+
+    def set_ChannelCurrent(self, value):
+        self.instr.write(f"SOURce:CURRent:LEVel:IMMediate:AMPLitude {value}")
+
+    def set_OutputState(self, state):
+        self.instr.write(f"SOURce:OUTPut:STATe {state}")
+
+    def clearStatus(self):
+        self.instr.write("*CLS")
+
+    def queryError(self):
+        return self.instr.query("SYST:ERR?")
+
+class AC_Source_68xx(Subsystem):
+    """Child Class for AC_Source_68xx Subsystem"""
+
+    def __init__(self, VISA_ADDRESS):
+        super().__init__(VISA_ADDRESS)
+
+    def setOutputVoltage(self, value):
+        self.instr.write(f"SOURce:VOLTage:LEVel:IMMediate:AMPLitude {value}")
+
+    def setOutputCurrent(self, value):
+        self.instr.write(f"SOURce:CURRent:LEVel:IMMediate {value}")
+
+    def setOutputState(self, state):
+        self.instr.write(f"OUTPut:STATe {state}")
+
+    def clearStatus(self):
+        self.instr.write("*CLS")
+
+    def queryError(self):
+        return self.instr.query("SYSTem:ERRor?")
+
+    def setFrequency(self, value):
+        self.instr.write(f"SOURce:FREQuency:IMMediate {value}")
+
+    def setPhase(self, value):
+        self.instr.write(f"SOURce:PHASe:IMMediate {value}")
+
+    def measureVoltage_AC(self):
+        return self.instr.query("MEASure:SCALar:VOLTage:AC?")
+
+    def measureCurrent_AC(self):
+        return self.instr.query("MEASure:SCALar:CURRent:AC?")
+
+    def measureVoltage_DC(self):
+        return self.instr.query("MEASure:SCALar:VOLTage:DC?")
+
+    def measureCurrent_DC(self):
+        return self.instr.query("MEASure:SCALar:CURRent:DC?")
+
+    def measurePower_AC_Real(self):
+        return self.instr.query("MEASure:SCALar:POWer:AC:REAL?")
+
+    def measurePower_AC_Apparent(self):
+        return self.instr.query("MEASure:SCALar:POWer:AC:APParent?")
+
+    def measurePower_DC_Real(self):
+        return self.instr.query("MEASure:SCALar:POWer:DC:REAL?")

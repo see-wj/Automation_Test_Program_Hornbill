@@ -59,7 +59,6 @@ def _measure_hornbill_readback(psu, configuration, channel, current_input="FULL"
     )
     return voltage_monitor, current, voltage_local
 
-
 def _start_keysight_eload(eload, configuration):
     initial_current = max(0.0, float(configuration["minCurrent"]))
     eload.setOutputCurrent(initial_current)
@@ -95,7 +94,6 @@ def _sinking_voltage_points(configuration):
     if final - points[-1] > tolerance:
         points.append(final)
     return tuple(points)
-
 
 def _start_keysight_eload_to_psu_mode(eload, configuration):
     eload.setEmulationMode("PSUPply")
@@ -137,7 +135,6 @@ def _configure_external_source(source_class, configuration):
     WAI(configuration["ExternalSource"])
 
     return external_source
-
 
 ###############################Sourcing Mode CV#######################################
 class HornbillVoltageMeasurementwithELoad:
@@ -564,7 +561,6 @@ class HornbillVoltageMeasurementwithELoad:
             WAI(dict["PSU"])
             self.infoList.insert(k, [V, I_fixed, i])
 
-            sleep(float(self.updatedelay))
 
             #Readback Voltage and Current
             cleandiagVmon, cleandiagImon, cleandiagVloc = _measure_hornbill_readback(
@@ -968,7 +964,7 @@ class HornbillVoltageMeasurementwithELoadwithOscilloscope:
 
                 oscilloscope.run()
                 oscilloscope.setTimeScale(100e-3)  # Set time scale to 10 ms/div
-                sleep(1)
+                sleep(2)
                 oscilloscope.stop()
                 try:
                     displayData = oscilloscope.read_binary_data()
@@ -2285,6 +2281,105 @@ class HornbillCurrentMeasurementwithELoad_IMON_2mA :
         WAI(dict["DMM2"])
 
         return self.infoList, self.dataList, self.dataList2
+
+class PowerStudy_HIGH_MID_LOW_KNEE:
+    def __init__(self):
+            self.results = []
+            self.infoList = []
+            self.dataList = []
+            self.dataList2 = []
+    
+    def Execute_Power_Study(self,dict,channel, worker=None):
+        (
+            Read,
+            Apply,
+            Display,
+            Function,
+            Frequency,
+            Output,
+            Measure,
+            Sense,
+            Configure,
+            Delay,
+            Trigger,
+            Sample,
+            Initiate,
+            Fetch,
+            Status,
+            Voltage,
+            Current,
+            Oscilloscope,
+            Excavator,
+            Power,
+            Hornbill,
+            SMU_N67XX,
+            DMM_344XXA,
+            DMM_3458A,
+            ELOAD_E367XXA,
+        ) = Dimport.getClasses_Keysight(dict["Instrument"])
+
+        (
+            Channel,
+            Mode,
+            Voltage,
+        ) = Dimport.getClasses_Chroma("Chroma")
+
+
+        #Channel Loop (For usage of All Channels, the channel is taken from Execute Function in GUI.py)
+        ch = channel
+    
+        """Execution of Power Study for Programm / Readback Accuracy using Status Event Registry to synchronize Instrument
+
+        The function first declares two lists, datalist & infolist that will be used to collect data.
+        It then dynamically imports the library to be used. Next, the settings for all Instrument
+        are initialized. The test loop begins where Voltage and Current Sweep is conducted and collect
+        measured data.
+
+        The synchronization of Instrument here is done by reading the status of the event registry.
+        The status determined from the Instrument can let the program determine if the Instrument is
+        measuring. The program will only proceed to tell the Instrument to query the measured value
+        after it is determined that the measurement has been completed. This method is suitable for
+        operations that require a longer time (e.g. 100 NPLC). However the implementation is slighty
+        more complicated than other methods. This method only can be implemented that have the specific
+        commands that are used.
+
+        In line 605, where V_fixed - 0.001 * V_fixed is done to prevent the ELoad from causing the DUT
+        to enter CV Mode.
+
+        Args:
+            Instrument: String determining which library to be used.
+            Error_Gain: Float determining the error gain of the Readback Voltage Specification.
+            Error_Offset: Float determining the error offset of the Readback Voltage Specification.
+            minCurrent: Float determining the start current for Current Sweep.
+            maxCurrent: Float determining the stop current for Current Sweep.
+            current_stepsize: Float determining the step size during Current Sweep.
+            minVoltage: Float determining the start voltage for Voltage Sweep.
+            maxVoltage: Float determining the stop voltage for Voltage Sweep.
+            voltage_stepsize: Float determining the step_size for Voltage_Sweep.
+            PSU: String containing the VISA Address of the PSU used.
+            DMM: String containing the VISA Address of the DMM used.
+            ELoad: String containing the VISA Address of the ELoad used.
+            "ELoad_Channel: Integer containing the channel number that the ELoad is using.
+            PSU_Channel: Integer containing the channel number that the PSU is using.
+            setCurrent_Sense: String determining the Current Sense that will be used.
+            setCurrent_Res: String determining the Current Resolution that will be used.
+            setMode: String determining the Priority mode of the ELoad.
+            Range: String determining the measuring range of the DMM should be Auto or a specific range.
+            Apreture: String determining the NPLC to be used by DMM when measuring.
+            AutoZero: String determining if AutoZero Mode on DMM should be enabled/disabled.
+            InputZ: String determining the Input Impedance Mode of DMM.
+            UpTime: Float containing details regarding the uptime delay.
+            DownTime: Float containing details regarding the downtime delay.
+            current_iter: integer storing the number of iterations of current sweep.
+            voltage_iter: integer storing the number of iterations of voltage sweep.
+            status: float storing the value returned by the status event registry.
+            infoList: List containing the programmed data that was set by Program.
+            dataList: List containing the measured data that was queried from DUT.
+            dataList2: List containing additional measured data."""
+
+
+
+
 
 
 #############################Sinking Mode CV#########################################

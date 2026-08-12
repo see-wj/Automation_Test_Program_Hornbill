@@ -78,6 +78,14 @@ BASE_FIELDS = {
     "InputZ": "inputZ",
     "UpTime": "UpTime",
     "DownTime": "DownTime",
+    "AC_Supply_Type": "AC_Supply_Type",
+}
+
+AC_SOURCE_FIELDS = {
+    "ACSource": "ACSource",
+    "AC_CurrentLimit": "AC_CurrentLimit",
+    "AC_VoltageOutput": "AC_VoltageOutput",
+    "Frequency": "Frequency",
 }
 
 OSCILLOSCOPE_FIELDS = {
@@ -185,15 +193,11 @@ def build_test_parameters(parameters, selections):
             "power_step_size": "power_step_size",
         })
 
+    if str(_value(parameters, "AC_Supply_Type")).strip() == "AC Source":
+        _add_fields(result, parameters, AC_SOURCE_FIELDS)
+
     if selections.get("VoltageLineRegulation") or selections.get("CurrentLineRegulation"):
-        _add_fields(result, parameters, {
-            "ACSource": "ACSource",
-            "AC_CurrentLimit": "AC_CurrentLimit",
-            "AC_VoltageOutput": "AC_VoltageOutput",
-            "Frequency": "Frequency",
-            "AC_Supply_Type": "AC_Supply_Type",
-            "Line_Reg_Range": "Line_Reg_Range",
-        })
+        _add_fields(result, parameters, {"Line_Reg_Range": "Line_Reg_Range"})
 
     return result
 
