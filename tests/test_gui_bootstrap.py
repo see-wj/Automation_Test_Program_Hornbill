@@ -12,10 +12,8 @@ class GuiBootstrapTests(unittest.TestCase):
         visa_initialization = source.index(
             "    main_thread_resource_manager = initialize_main_thread_visa()"
         )
-        pyqtgraph_import = source.index("import pyqtgraph")
         pyqt_import = source.index("from PyQt5")
 
-        self.assertLess(visa_initialization, pyqtgraph_import)
         self.assertLess(visa_initialization, pyqt_import)
 
     def test_packaged_runtime_hook_initializes_visa_before_entry_point(self):
@@ -35,6 +33,16 @@ class GuiBootstrapTests(unittest.TestCase):
         self.assertIn('"--visa-diagnostics" in sys.argv', source)
         self.assertIn("main_thread_resource_manager.visalib", source)
         self.assertIn('gpib_instrument.write("ID?")', source)
+
+    def test_legacy_dialogs_are_archived_outside_the_entry_point(self):
+        source = (ROOT / "src" / "GUI.py").read_text(encoding="utf-8")
+        legacy_source = ROOT / "src" / "legacy" / "legacy_gui.py"
+
+        self.assertTrue(legacy_source.exists())
+        self.assertNotIn("class VoltageMeasurementDialog", source)
+        self.assertNotIn("class CurrentMeasurementDialog", source)
+        self.assertNotIn("class ProgrammingSpeed", source)
+        self.assertNotIn("class PowerMeasurementDialog", source)
 
 
 if __name__ == "__main__":

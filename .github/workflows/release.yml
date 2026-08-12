@@ -1,0 +1,52 @@
+name: Build and Publish Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      QT_QPA_PLATFORM: offscreen
+      MPLBACKEND: Agg
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.0"
+          cache: pip
+
+      - name: Install build dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Build application and update package
+        shell: pwsh
+        run: |
+          $env:AUTOMATION_BUILD_VERSION = "${{ github.ref_name }}".TrimStart("v")
+          python Make_GUI_Executable_Program.py
+
+      - name: Publish GitHub release assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $releaseDirectory = Get-ChildItem "Executable_Builds" -Directory |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          $archive = Get-ChildItem $releaseDirectory.FullName -Filter "Test_Automation_Program-*.zip" |
+            Select-Object -First 1
+          $manifest = Join-Path $releaseDirectory.FullName "update_manifest.json"
+          gh release create "${{ github.ref_name }}" `
+            $archive.FullName `
+            $manifest `
+            --generate-notes `
+            --title "Test Automation Program ${{ github.ref_name }}"

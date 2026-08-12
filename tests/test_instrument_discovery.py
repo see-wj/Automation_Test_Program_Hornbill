@@ -333,6 +333,90 @@ class InstrumentDiscoveryTests(unittest.TestCase):
         self.assertEqual(result.addresses, ["USB0::DMM::INSTR"])
         self.assertEqual(result.roles, {"DMM": "USB0::DMM::INSTR"})
 
+    def test_configured_discovery_probes_numbered_candidates_for_same_role(self):
+        identities = {
+            "TCPIP0::psu-primary::inst0::INSTR": "KEYSIGHT,PSU-A,SERIAL,1.0",
+            "TCPIP0::psu-backup::inst0::INSTR": "KEYSIGHT,PSU-B,SERIAL,1.0",
+            "GPIB0::22::INSTR": "HP3458A",
+            "USB0::DMM-B::INSTR": "KEYSIGHT,34470A,SERIAL,1.0",
+            "USB0::DMM-CURRENT::INSTR": "KEYSIGHT,34465A,SERIAL,1.0",
+        }
+        manager = DiscoveryManager(identities)
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / "config.txt"
+            config.write_text(
+                "PSU = TCPIP0::psu-primary::inst0::INSTR\n"
+                "PSU_2 = TCPIP0::psu-backup::inst0::INSTR\n"
+                "DMM = GPIB0::22::INSTR\n"
+                "DMM_2 = USB0::DMM-B::INSTR\n"
+                "DMM2 = USB0::DMM-CURRENT::INSTR\n",
+                encoding="utf-8",
+            )
+            with patch("instruments.instrument_discovery.time.sleep"):
+                result = get_configured_visa_resources(
+                    config,
+                    lambda: manager,
+                    enabled_transports={"tcpip_hostname", "gpib", "usb"},
+                )
+
+        self.assertEqual(result.addresses, list(identities))
+        self.assertEqual(
+            result.roles,
+            {
+                "PSU": "TCPIP0::psu-primary::inst0::INSTR",
+                "DMM": "GPIB0::22::INSTR",
+                "DMM2": "USB0::DMM-CURRENT::INSTR",
+            },
+        )
+
+    def test_configured_discovery_supports_external_source_role(self):
+        address = "TCPIP0::source-sink::inst0::INSTR"
+        manager = DiscoveryManager(
+            {address: "KEYSIGHT,N7950A,SERIAL,1.0"}
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / "config.txt"
+            config.write_text(
+                f"ExternalSource = {address}\n",
+                encoding="utf-8",
+            )
+            result = get_configured_visa_resources(
+                config,
+                lambda: manager,
+                enabled_transports={"tcpip_hostname"},
+            )
+
+        self.assertEqual(result.addresses, [address])
+        self.assertEqual(result.roles, {"EXTERNALSOURCE": address})
+
+    def test_numbered_candidate_replaces_unavailable_primary_selection(self):
+        backup_address = "TCPIP0::psu-backup::inst0::INSTR"
+
+        class ConfiguredManager(DiscoveryManager):
+            def open_resource(self, address, **options):
+                if address not in self.identities:
+                    raise RuntimeError("not connected")
+                return super().open_resource(address, **options)
+
+        manager = ConfiguredManager(
+            {backup_address: "KEYSIGHT,PSU-B,SERIAL,1.0"}
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / "config.txt"
+            config.write_text(
+                "PSU = TCPIP0::psu-primary::inst0::INSTR\n"
+                f"PSU_2 = {backup_address}\n",
+                encoding="utf-8",
+            )
+            result = get_configured_visa_resources(
+                config,
+                lambda: manager,
+                enabled_transports={"tcpip_hostname"},
+            )
+
+        self.assertEqual(result.addresses, [backup_address])
+        self.assertEqual(result.roles, {"PSU": backup_address})
+
 
 if __name__ == "__main__":
     unittest.main()

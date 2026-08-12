@@ -10,6 +10,8 @@ from execution.run_storage import RunStorage, create_run_storage
 
 REALTIME_COLUMNS = (
     "Index",
+    "Loop",
+    "Channel",
     "Set_Voltage",
     "Set_Current",
     "Programming_Voltage",
@@ -40,6 +42,8 @@ class RunContext:
     csv_file: object = field(default=None, init=False, repr=False)
     csv_writer: object = field(default=None, init=False, repr=False)
     data_index: int = field(default=0, init=False)
+    loop_index: int = field(default=1, init=False)
+    channel: object = field(default=None, init=False)
 
     @classmethod
     def create(
@@ -91,14 +95,22 @@ class RunContext:
         if not self.csv_writer:
             return
         values = tuple(values)
-        expected_values = len(REALTIME_COLUMNS) - 1
+        expected_values = len(REALTIME_COLUMNS) - 3
         if len(values) != expected_values:
             raise ValueError(
                 f"Realtime row requires {expected_values} values, got {len(values)}"
             )
         self.data_index += 1
-        self.csv_writer.writerow((self.data_index, *values))
+        self.csv_writer.writerow(
+            (self.data_index, self.loop_index, self.channel, *values)
+        )
         self.csv_file.flush()
+
+    def set_measurement_context(self, loop_index, channel):
+        self.loop_index = max(1, int(loop_index))
+        if isinstance(channel, (list, tuple)) and len(channel) == 1:
+            channel = channel[0]
+        self.channel = channel
 
     def activate_data_paths(self):
         from reporting import data as data_module

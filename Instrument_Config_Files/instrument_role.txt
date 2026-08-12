@@ -2,6 +2,7 @@
 E36441A: PSU
 LINUXGEN: PSU
 Hornbill: PSU
+RP5935A: PSU
 
 //Electronics Load Instrument 
 EL33133A: ELOAD

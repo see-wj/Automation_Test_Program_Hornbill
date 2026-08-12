@@ -4,7 +4,7 @@ from openpyxl.formatting.rule import FormulaRule
 import pandas as pd
 import datetime
 import os
-from openpyxl.chart import LineChart, Reference, Series
+from openpyxl.chart import LineChart, Reference, ScatterChart, Series
 import win32com.client 
 import re
 from pathlib import Path
@@ -12,6 +12,12 @@ from openpyxl.utils import get_column_letter
 from openpyxl.utils.units import pixels_to_EMU
 from openpyxl import load_workbook
 from openpyxl.chart.legend import Legend
+from openpyxl.chart.text import RichText
+from openpyxl.drawing.text import (
+    CharacterProperties,
+    Paragraph,
+    ParagraphProperties,
+)
 from common.path import csv_folder, IMAGE_DIR, IMAGE_PATH, IMAGE_PATH_2
 
 
@@ -25,6 +31,17 @@ def configure_run_storage(raw_directory, chart_directory):
 
 class xlreport:
     """Generates an Excel report for voltage/current accuracy tests with conditional formatting and embedded images."""
+
+    CHART_SERIES_COLORS = (
+        "4472C4",
+        "ED7D31",
+        "7030A0",
+        "00A6A6",
+        "A0522D",
+        "C55A11",
+        "5B9BD5",
+        "8064A2",
+    )
 
     def __init__(
         self,
@@ -70,6 +87,376 @@ class xlreport:
         """Align a specific cell in the worksheet."""
         worksheet.cell(row=row, column=col).alignment = Alignment(horizontal=style)
 
+    def _add_condition_formatting(
+        self,
+        worksheet,
+        dataframe,
+        start_column=4,
+        first_data_row=9,
+    ):
+        last_data_row = first_data_row + len(dataframe) - 1
+        for column_name in (
+            "Programming Condition",
+            "Readback Condition",
+            "Programming Percentage Condition",
+            "Readback Percentage Condition",
+        ):
+            if column_name not in dataframe.columns:
+                continue
+            column_number = start_column + dataframe.columns.get_loc(column_name)
+            column_letter = get_column_letter(column_number)
+            cell_range = (
+                f"{column_letter}{first_data_row}:"
+                f"{column_letter}{last_data_row}"
+            )
+            first_cell = f"{column_letter}{first_data_row}"
+            worksheet.conditional_formatting.add(
+                cell_range,
+                FormulaRule(
+                    formula=[f'NOT(ISERROR(SEARCH("PASS",{first_cell})))'],
+                    fill=self.green_fill,
+                    font=self.green_font,
+                ),
+            )
+            worksheet.conditional_formatting.add(
+                cell_range,
+                FormulaRule(
+                    formula=[f'NOT(ISERROR(SEARCH("FAIL",{first_cell})))'],
+                    fill=self.red_fill,
+                    font=self.red_font,
+                ),
+            )
+
+    @staticmethod
+    def _bold_text_properties(size):
+        character_properties = CharacterProperties(
+            b=True,
+            sz=size,
+            solidFill="000000",
+        )
+        return RichText(
+            p=[
+                Paragraph(
+                    pPr=ParagraphProperties(
+                        defRPr=character_properties,
+                    ),
+                    endParaRPr=CharacterProperties(
+                        b=True,
+                        sz=size,
+                        solidFill="000000",
+                    ),
+                )
+            ]
+        )
+
+    @staticmethod
+    def _bold_chart_title(title, size):
+        if title is None or title.tx is None or title.tx.rich is None:
+            return
+        for paragraph in title.tx.rich.p:
+            paragraph.pPr = ParagraphProperties(
+                defRPr=CharacterProperties(
+                    b=True,
+                    sz=size,
+                    solidFill="000000",
+                )
+            )
+            paragraph.endParaRPr = CharacterProperties(
+                b=True,
+                sz=size,
+                solidFill="000000",
+            )
+            for run in paragraph.r:
+                run.rPr = CharacterProperties(
+                    b=True,
+                    sz=size,
+                    solidFill="000000",
+                )
+
+    def _style_native_chart(self, chart):
+        self._bold_chart_title(chart.title, 1600)
+        self._bold_chart_title(chart.x_axis.title, 1200)
+        self._bold_chart_title(chart.y_axis.title, 1200)
+        chart.x_axis.txPr = self._bold_text_properties(1000)
+        chart.y_axis.txPr = self._bold_text_properties(1000)
+        chart.legend.txPr = self._bold_text_properties(1000)
+
+    @staticmethod
+    def _chart_specs(dataframe):
+        mode = str(dataframe["Chart Mode"].iloc[0])
+        if mode.startswith("VOLTAGE"):
+            x_title = (
+                "Current (A)"
+                if mode == "VOLTAGE_CURRENT_CHANGE"
+                else "Voltage (V)"
+            )
+            chart_specs = [
+                (
+                    "Voltage Programming Error",
+                    "Programming/Voltage Absolute Error (V)",
+                    "Programming Upper Error Boundary (V)",
+                    "Programming Lower Error Boundary (V)",
+                    "Programming Condition",
+                    "Programming/Voltage Absolute Error (V)",
+                ),
+                (
+                    "Voltage Readback Error",
+                    "PSU Readback Voltage Error (V)",
+                    "Readback Upper Error Boundary (V)",
+                    "Readback Lower Error Boundary (V)",
+                    "Readback Condition",
+                    "PSU Readback Voltage Error (V)",
+                ),
+                (
+                    "Voltage Programming Percentage Error",
+                    "Relative/Voltage Percentage Error (%)",
+                    "Programming Upper Percentage Error Boundary (%)",
+                    "Programming Lower Percentage Error Boundary (%)",
+                    "Programming Percentage Condition",
+                    "Relative/Voltage Percentage Error (%)",
+                ),
+                (
+                    "Voltage Readback Percentage Error",
+                    "PSU Readback Voltage Percentage Error (%)",
+                    "Readback Upper Percentage Error Boundary (%)",
+                    "Readback Lower Percentage Error Boundary (%)",
+                    "Readback Percentage Condition",
+                    "PSU Readback Voltage Percentage Error (%)",
+                ),
+            ]
+            if "PSU Local Voltage Error (V)" in dataframe.columns:
+                chart_specs.append(
+                    (
+                        "PSU Local Voltage Error (VLOC - VMON)",
+                        "PSU Local Voltage Error (V)",
+                        None,
+                        None,
+                        None,
+                        "PSU Local Voltage Error (V)",
+                    )
+                )
+            return x_title, tuple(chart_specs)
+
+        return "Current (A)", (
+            (
+                "Current Programming Error",
+                "Programming/Current Absolute Error (A)",
+                "Programming Upper Error Boundary (A)",
+                "Programming Lower Error Boundary (A)",
+                "Programming Condition",
+                "Programming/Current Absolute Error (A)",
+            ),
+            (
+                "Current Readback Error",
+                "PSU Readback Current Error (A)",
+                "Readback Upper Error Boundary (A)",
+                "Readback Lower Error Boundary (A)",
+                "Readback Condition",
+                "PSU Readback Current Error (A)",
+            ),
+            (
+                "Current Programming Percentage Error",
+                "Relative/Current Percentage Error (%)",
+                "Programming Upper Percentage Error Boundary (%)",
+                "Programming Lower Percentage Error Boundary (%)",
+                "Programming Percentage Condition",
+                "Relative/Current Percentage Error (%)",
+            ),
+            (
+                "Current Readback Percentage Error",
+                "PSU Readback Current Percentage Error (%)",
+                "Readback Upper Percentage Error Boundary (%)",
+                "Readback Lower Percentage Error Boundary (%)",
+                "Readback Percentage Condition",
+                "PSU Readback Current Percentage Error (%)",
+            ),
+        )
+
+    @staticmethod
+    def _write_chart_values(worksheet, column, title, x_values, y_values):
+        worksheet.cell(row=1, column=column, value=f"{title} X")
+        worksheet.cell(row=1, column=column + 1, value=title)
+        for row, (x_value, y_value) in enumerate(zip(x_values, y_values), start=2):
+            worksheet.cell(row=row, column=column, value=x_value)
+            worksheet.cell(row=row, column=column + 1, value=y_value)
+        return column, column + 1, len(x_values) + 1
+
+    @staticmethod
+    def _append_chart_series(
+        chart,
+        worksheet,
+        columns,
+        title,
+        color,
+        marker=False,
+        line=True,
+        dashed=False,
+        line_width=None,
+    ):
+        x_column, y_column, last_row = columns
+        if last_row < 2:
+            return
+        x_values = Reference(
+            worksheet,
+            min_col=x_column,
+            min_row=2,
+            max_row=last_row,
+        )
+        y_values = Reference(
+            worksheet,
+            min_col=y_column,
+            min_row=2,
+            max_row=last_row,
+        )
+        series = Series(y_values, x_values, title=title)
+        if line:
+            series.graphicalProperties.line.solidFill = color
+            series.graphicalProperties.line.width = pixels_to_EMU(
+                line_width if line_width is not None else 3.2
+            )
+            if dashed:
+                series.graphicalProperties.line.dashStyle = "dash"
+        else:
+            series.graphicalProperties.line.noFill = True
+        if marker:
+            series.marker.symbol = "circle"
+            series.marker.size = 8
+            series.marker.graphicalProperties.solidFill = color
+            series.marker.graphicalProperties.line.solidFill = color
+        else:
+            series.marker.symbol = "none"
+        chart.series.append(series)
+
+    def _add_native_charts(self, workbook, dataframe):
+        required = {"Chart Mode", "Chart X", "Chart Group"}
+        if dataframe.empty or not required.issubset(dataframe.columns):
+            return
+
+        for sheet_name in ("Charts", "ChartData"):
+            if sheet_name in workbook.sheetnames:
+                del workbook[sheet_name]
+        chart_sheet = workbook.create_sheet("Charts")
+        source_sheet = workbook.create_sheet("ChartData")
+        source_sheet.sheet_state = "hidden"
+        x_title, chart_specs = self._chart_specs(dataframe)
+        chart_positions = ("A1", "J1", "A22", "J22", "A43")
+        source_column = 1
+
+        for position, spec in zip(chart_positions, chart_specs):
+            title, value_column, upper_column, lower_column, condition_column, y_title = spec
+            required_columns = {value_column}
+            required_columns.update(
+                column
+                for column in (upper_column, lower_column, condition_column)
+                if column is not None
+            )
+            if not required_columns.issubset(dataframe.columns):
+                continue
+
+            chart = ScatterChart()
+            chart.scatterStyle = "lineMarker"
+            chart.style = 13
+            chart.title = title
+            chart.x_axis.title = x_title
+            chart.y_axis.title = y_title
+            chart.width = 18
+            chart.height = 11.5
+            chart.legend.position = "b"
+            self._style_native_chart(chart)
+
+            for group_index, (group_title, group) in enumerate(
+                dataframe.groupby("Chart Group", sort=False)
+            ):
+                points = group[["Chart X", value_column]].dropna()
+                columns = self._write_chart_values(
+                    source_sheet,
+                    source_column,
+                    str(group_title),
+                    points["Chart X"].tolist(),
+                    points[value_column].tolist(),
+                )
+                self._append_chart_series(
+                    chart,
+                    source_sheet,
+                    columns,
+                    str(group_title),
+                    self.CHART_SERIES_COLORS[
+                        group_index % len(self.CHART_SERIES_COLORS)
+                    ],
+                )
+                source_column += 2
+
+            if upper_column is not None and lower_column is not None:
+                boundary_points = dataframe[
+                    ["Chart X", upper_column, lower_column]
+                ].dropna()
+                for boundary_title, boundary_column in (
+                    ("Upper Bound", upper_column),
+                    ("Lower Bound", lower_column),
+                ):
+                    columns = self._write_chart_values(
+                        source_sheet,
+                        source_column,
+                        boundary_title,
+                        boundary_points["Chart X"].tolist(),
+                        boundary_points[boundary_column].tolist(),
+                    )
+                    self._append_chart_series(
+                        chart,
+                        source_sheet,
+                        columns,
+                        boundary_title,
+                        "FF0000",
+                        dashed=True,
+                        line_width=4.5,
+                    )
+                    source_column += 2
+
+            if condition_column is not None:
+                for status, color in (("PASS", "00B050"), ("FAIL", "FF0000")):
+                    status_points = dataframe.loc[
+                        dataframe[condition_column].astype(str).str.upper() == status,
+                        ["Chart X", value_column],
+                    ].dropna()
+                    columns = self._write_chart_values(
+                        source_sheet,
+                        source_column,
+                        status,
+                        status_points["Chart X"].tolist(),
+                        status_points[value_column].tolist(),
+                    )
+                    self._append_chart_series(
+                        chart,
+                        source_sheet,
+                        columns,
+                        status,
+                        color,
+                        marker=True,
+                        line=False,
+                    )
+                    source_column += 2
+
+            x_values = pd.to_numeric(dataframe["Chart X"], errors="coerce").dropna()
+            if not x_values.empty:
+                columns = self._write_chart_values(
+                    source_sheet,
+                    source_column,
+                    "Zero",
+                    [float(x_values.min()), float(x_values.max())],
+                    [0.0, 0.0],
+                )
+                self._append_chart_series(
+                    chart,
+                    source_sheet,
+                    columns,
+                    "Zero",
+                    "808080",
+                    dashed=True,
+                )
+                source_column += 2
+
+            chart_sheet.add_chart(chart, position)
+
     def run(self):
         """Generate the Excel report by importing CSV data, adding conditional formatting, and embedding an image."""
         """# Define chart_path for image insertion
@@ -81,13 +468,18 @@ class xlreport:
         csv_directory = self.csv_folder
         chart_path = str(self.chart_directory / "Chart.png")
         chart_path_2 = str(self.chart_directory / "Chart2.png")
-
-
         try:
             with pd.ExcelWriter(self.path, engine="openpyxl") as writer:
                 # Read CSV files
                 try:
                     df1 = pd.read_csv(os.path.join(csv_directory, "error.csv"))
+                    chart_dataframe = df1
+                    percentage_path = os.path.join(
+                        csv_directory,
+                        "error_percent.csv",
+                    )
+                    if os.path.exists(percentage_path):
+                        chart_dataframe = pd.read_csv(percentage_path)
                     #df3 = pd.read_csv(os.path.join(csv_folder, "error_percent.csv"))
                     df2 = pd.read_csv(os.path.join(csv_directory, "instrumentData.csv"))
                     df4 = pd.read_csv(os.path.join(csv_directory, "config.csv"))
@@ -105,27 +497,8 @@ class xlreport:
                 wb = writer.book
                 ws = wb["Data"]
 
-                # Apply conditional formatting to df1's "Condition" column
-                last_row = len(df1) + 8  # Assuming data starts at row 9
-                cell_range1 = f"O9:O{last_row}"
-                ws.conditional_formatting.add(
-                    cell_range1,
-                    FormulaRule(formula=['NOT(ISERROR(SEARCH("PASS",O9)))'], fill=self.green_fill, font=self.green_font),
-                )
-                ws.conditional_formatting.add(
-                    cell_range1,
-                    FormulaRule(formula=['NOT(ISERROR(SEARCH("FAIL",O9)))'], fill=self.red_fill, font=self.red_font),
-                )
-                
-                cell_range2 = f"R9:R{last_row}"
-                ws.conditional_formatting.add(
-                    cell_range2,
-                    FormulaRule(formula=['NOT(ISERROR(SEARCH("PASS",R9)))'], fill=self.green_fill, font=self.green_font),
-                )
-                ws.conditional_formatting.add(
-                    cell_range2,
-                    FormulaRule(formula=['NOT(ISERROR(SEARCH("FAIL",R9)))'], fill=self.red_fill, font=self.red_font),
-                )
+                self._add_condition_formatting(ws, df1)
+                self._add_native_charts(wb, chart_dataframe)
 
 
                 # Adjust column widths
@@ -135,18 +508,25 @@ class xlreport:
                 ws.cell(row=7, column=4, value="Time Generated:")
                 ws.cell(row=7, column=5, value=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-                # Insert chart image, if it exists
                 if os.path.exists(chart_path):
-                    img = openpyxl.drawing.image.Image(chart_path)
-                    img.anchor = "A34"  # Set image position
-                    ws.add_image(img)
-                    img2 = openpyxl.drawing.image.Image(chart_path_2)
-                    img2.anchor = "A67"  # Set second image position
-                    ws.add_image(img2)
-
+                    chart_image = openpyxl.drawing.image.Image(chart_path)
+                    chart_image.anchor = "A34"
+                    ws.add_image(chart_image)
                 else:
-                    print(f"Warning: Image '{chart_path}' not found. Skipping image insertion.")
-                    print(f"Warning: Image '{chart_path_2}' not found. Skipping image insertion.")
+                    print(
+                        f"Warning: Image '{chart_path}' not found. "
+                        "Skipping image insertion."
+                    )
+
+                if os.path.exists(chart_path_2):
+                    percentage_chart_image = openpyxl.drawing.image.Image(chart_path_2)
+                    percentage_chart_image.anchor = "A67"
+                    ws.add_image(percentage_chart_image)
+                else:
+                    print(
+                        f"Warning: Image '{chart_path_2}' not found. "
+                        "Skipping image insertion."
+                    )
 
                 # Save the workbook
                 wb.save(self.path)

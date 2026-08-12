@@ -70,6 +70,7 @@ BASE_FIELDS = {
     "DMM_Model": "DMM_Model",
     "ELoad_Model": "ELoad_Model",
     "Hornbill_Measurement_Command": "Hornbill_Measurement_Command",
+    "SweepPoints": "SweepPoints",
     "Relay_Control": "Relay_Control",
     "Range": "Range",
     "Aperture": "Aperture",
@@ -77,6 +78,14 @@ BASE_FIELDS = {
     "InputZ": "inputZ",
     "UpTime": "UpTime",
     "DownTime": "DownTime",
+    "AC_Supply_Type": "AC_Supply_Type",
+}
+
+AC_SOURCE_FIELDS = {
+    "ACSource": "ACSource",
+    "AC_CurrentLimit": "AC_CurrentLimit",
+    "AC_VoltageOutput": "AC_VoltageOutput",
+    "Frequency": "Frequency",
 }
 
 OSCILLOSCOPE_FIELDS = {
@@ -95,6 +104,19 @@ OSCILLOSCOPE_FIELDS = {
     "OSC": "OSC",
 }
 
+SINKING_TEST_FIELDS = {
+    "ExternalSource": "ExternalSource",
+    "External_Source_Positive_Current_Limit": (
+        "External_Source_Positive_Current_Limit"
+    ),
+    "External_Source_Negative_Current_Limit": (
+        "External_Source_Negative_Current_Limit"
+    ),
+    "slewrate": "slewrate",
+    "Sinking_Initial_Voltage": "Sinking_Initial_Voltage",
+    "Sinking_Final_Voltage": "Sinking_Final_Voltage",
+    "Sinking_Voltage_Step_Size": "Sinking_Voltage_Step_Size",
+}
 
 def _value(parameters, attribute):
     if isinstance(parameters, dict):
@@ -115,7 +137,8 @@ def build_test_parameters(parameters, selections):
         and selections.get("CurrentStatic(VoltageChange)withOscilloscope")
     ):
         _add_fields(result, parameters, OSCILLOSCOPE_FIELDS)
-
+    if selections.get("SinkingTest"):
+        _add_fields(result, parameters, SINKING_TEST_FIELDS)
     if selections.get("Current_Test"):
         _add_fields(result, parameters, {
             "rshunt": "rshunt", "DMM2": "DMM2", "powerfin": "Power"
@@ -170,15 +193,11 @@ def build_test_parameters(parameters, selections):
             "power_step_size": "power_step_size",
         })
 
+    if str(_value(parameters, "AC_Supply_Type")).strip() == "AC Source":
+        _add_fields(result, parameters, AC_SOURCE_FIELDS)
+
     if selections.get("VoltageLineRegulation") or selections.get("CurrentLineRegulation"):
-        _add_fields(result, parameters, {
-            "ACSource": "ACSource",
-            "AC_CurrentLimit": "AC_CurrentLimit",
-            "AC_VoltageOutput": "AC_VoltageOutput",
-            "Frequency": "Frequency",
-            "AC_Supply_Type": "AC_Supply_Type",
-            "Line_Reg_Range": "Line_Reg_Range",
-        })
+        _add_fields(result, parameters, {"Line_Reg_Range": "Line_Reg_Range"})
 
     return result
 

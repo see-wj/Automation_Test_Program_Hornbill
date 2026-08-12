@@ -70,7 +70,7 @@ class KeysightCommandTabTests(unittest.TestCase):
             for row in range(self.tab.command_table.rowCount())
         }
 
-        self.assertEqual(len(rows), 26)
+        self.assertEqual(len(rows), 30)
         self.assertIn("measureVoltageDC", rows)
         self.assertIn("MEAS:VOLT:DC? (@1)", rows["measureVoltageDC"]["command"])
         self.assertIn("DIAG:PEEK? 20,0,100000", rows["measureReadbackVoltage"]["command"])

@@ -7,13 +7,13 @@ from pyvisa.rname import ResourceName
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import (
     QDialog,
+    QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QSpinBox,
     QTextEdit,
     QVBoxLayout,
 )
@@ -39,6 +39,7 @@ class CalWorker(QThread):
     stopped = pyqtSignal()
 
     DMM_RANGES = {"P1": 10, "P2": 100}
+    DMM_LABEL = "3458A"
 
     def __init__(
         self,
@@ -51,6 +52,7 @@ class CalWorker(QThread):
         resource_manager_factory=create_resource_manager,
         command_delay=0.2,
         settling_delay=5.0,
+        calibration_time=60.0,
         resource_manager=None,
         psu=None,
         dmm=None,
@@ -59,15 +61,33 @@ class CalWorker(QThread):
         self.psu_addr = psu_addr
         self.dmm_addr = dmm_addr
         self.password = password
-        self.channel = int(channel)
+        self.channels = self._normalize_channels(channel)
+        self.channel = self.channels[0]
         self.cal_points = [point.upper() for point in cal_points]
         self.resource_manager_factory = resource_manager_factory
         self.command_delay = float(command_delay)
         self.settling_delay = float(settling_delay)
+        self.calibration_time = float(calibration_time)
         self.resource_manager = resource_manager
         self.psu = psu
         self.dmm = dmm
         self._stop_requested = threading.Event()
+
+    @staticmethod
+    def _normalize_channels(channels):
+        if isinstance(channels, str):
+            values = [value.strip() for value in channels.split(",") if value.strip()]
+        elif isinstance(channels, (list, tuple, set)):
+            values = list(channels)
+        else:
+            values = [channels]
+
+        normalized = []
+        for value in values:
+            channel = int(value)
+            if channel not in normalized:
+                normalized.append(channel)
+        return normalized
 
     def stop(self):
         self._stop_requested.set()
@@ -85,11 +105,24 @@ class CalWorker(QThread):
         instrument.write(command)
         self._wait(self.command_delay if delay is None else delay)
 
-    def _check_psu_error(self, psu):
-        error = psu.query("SYST:ERR?").strip()
-        if error.startswith("0") or error.startswith("+0"):
-            return
-        raise RuntimeError(f"PSU error: {error}")
+    def _check_psu_error(self, psu, *, retries=3, retry_delay=0.5):
+        last_error = None
+        for attempt in range(retries):
+            self._checkpoint()
+            try:
+                error = psu.query("SYST:ERR?").strip()
+            except Exception as exception:
+                if attempt < retries - 1:
+                    self._wait(retry_delay)
+                    continue
+                raise RuntimeError(f"Unable to read PSU error: {exception}") from exception
+            if error.startswith("0") or error.startswith("+0"):
+                return
+            last_error = error
+            if attempt < retries - 1:
+                self._wait(retry_delay)
+                continue
+        raise RuntimeError(f"PSU error: {last_error}")
 
     def _configure_3458a(self, dmm):
         commands = (
@@ -118,21 +151,37 @@ class CalWorker(QThread):
             raise RuntimeError(f"Invalid 3458A reading: {reading!r}") from exception
         return reading
 
+    def _configure_dmm(self, dmm):
+        self._configure_3458a(dmm)
+
+    def _set_dmm_range(self, dmm, dmm_range):
+        self._write(dmm, f"DCV {dmm_range}", delay=0)
+
+    def _measure_dmm(self, dmm):
+        return self._measure_3458a(dmm)
+
     def _validate(self):
         if not self.psu_addr or not self.dmm_addr:
             raise ValueError("PSU and DMM VISA addresses are required")
         if not self.password:
             raise ValueError("Calibration password is required")
-        if not 1 <= self.channel <= 4:
-            raise ValueError("Calibration channel must be between 1 and 4")
+        if not self.channels:
+            raise ValueError("At least one calibration channel is required")
+        invalid_channels = [
+            channel for channel in self.channels if not 1 <= channel <= 4
+        ]
+        if invalid_channels:
+            raise ValueError("Calibration channels must be between 1 and 4")
         if not self.cal_points:
             raise ValueError("At least one calibration point is required")
+        if self.calibration_time < 0:
+            raise ValueError("Calibration time cannot be negative")
         unsupported = [
             point for point in self.cal_points if point not in self.DMM_RANGES
         ]
         if unsupported:
             raise ValueError(
-                "3458A voltage calibration supports only P1 and P2"
+                f"{self.DMM_LABEL} voltage calibration supports only P1 and P2"
             )
         self.psu_addr = normalize_visa_address(self.psu_addr)
         self.dmm_addr = normalize_visa_address(self.dmm_addr)
@@ -170,45 +219,77 @@ class CalWorker(QThread):
                 self.log.emit(f"Using connected PSU: {self.psu_addr}")
             psu.timeout = 60000
             if dmm is None:
-                self.log.emit(f"Opening 3458A: {self.dmm_addr}")
-                dmm = self._open_resource(resource_manager, self.dmm_addr, "3458A")
+                self.log.emit(f"Opening {self.DMM_LABEL}: {self.dmm_addr}")
+                dmm = self._open_resource(
+                    resource_manager,
+                    self.dmm_addr,
+                    self.DMM_LABEL,
+                )
             else:
-                self.log.emit(f"Using connected 3458A: {self.dmm_addr}")
+                self.log.emit(
+                    f"Using connected {self.DMM_LABEL}: {self.dmm_addr}"
+                )
             dmm.timeout = 10000
 
-            self.log.emit("Enabling Four Wire.")
-            self._write(psu, f"SOURce:VOLTage:SENSe:SOURce EXT, (@{self.channel})")
-            self._write(psu, f"DIAG:POKE 50{self.channel-1}, 2865")
+            self.log.emit("Resetting PSU...")
+            self._write(psu, "*RST")
+            for channel in self.channels:
+                self._write(psu, f"OUTPut:STATe OFF, (@{channel})")
+                self.log.emit(
+                    f"Preparing channel {channel}: 6 V, output ON, four-wire sense..."
+                )
+                self._write(
+                    psu,
+                    f"SOURce:VOLTage:LEVel:IMMediate:AMPLitude 6, (@{channel})",
+                )
+                self._write(psu, f"OUTPut:STATe ON, (@{channel})")
+                self._write(
+                    psu,
+                    f"SOURce:VOLTage:SENSe:SOURce EXT, (@{channel})",
+                )
+                self._write(psu, f"DIAG:POKE 50{channel-1}, 2865")
 
             self.log.emit("Enabling PSU calibration mode...")
             self._write(psu, f'CAL:STAT ON,"{self.password}"')
             calibration_enabled = True
             self._check_psu_error(psu)
+            self._wait(2.0)
 
-            self.log.emit(f"Selecting 60 V calibration on channel {self.channel}...")
-            self._write(psu, f"CAL:VOLT 60,(@{self.channel})")
-            self._check_psu_error(psu)
-
-            self.log.emit("Configuring 3458A DMM...")
-            self._configure_3458a(dmm)
+            self.log.emit(f"Configuring {self.DMM_LABEL} DMM...")
+            self._configure_dmm(dmm)
             self._wait(0.5)
 
-            for point in self.cal_points:
-                dmm_range = self.DMM_RANGES[point]
-                self._write(dmm, f"DCV {dmm_range}", delay=0)
-                self.log.emit(f"Selecting calibration level {point}...")
-                self._write(psu, f"CAL:LEV {point}")
+            for channel in self.channels:
+                self.log.emit(f"Selecting 60 V calibration on channel {channel}...")
+                self._write(psu, f"CAL:VOLT 60,(@{channel})")
                 self._check_psu_error(psu)
-                self._wait(self.settling_delay)
+                self._wait(2.0)
 
-                self.log.emit(f"Measuring {point} with the 3458A...")
-                reading = self._measure_3458a(dmm)
-                self.log.emit(f"3458A reading = {reading}")
+                for point in self.cal_points:
+                    dmm_range = self.DMM_RANGES[point]
+                    self._set_dmm_range(dmm, dmm_range)
+                    self.log.emit(
+                        f"Channel {channel}: selecting calibration level {point}..."
+                    )
+                    self._write(psu, f"CAL:LEV {point}")
+                    self._wait(max(self.settling_delay, 2.0))
+                    self._check_psu_error(psu)
+                    self._wait(max(self.settling_delay, 2.0))
 
-                self.log.emit(f"Writing calibration data for {point}...")
-                self._write(psu, f"CAL:DATA {reading}")
-                self._check_psu_error(psu)
-                self._wait(1.0)
+                    self.log.emit(
+                        f"Channel {channel}: measuring {point} with the "
+                        f"{self.DMM_LABEL} after {self.calibration_time:g} s..."
+                    )
+                    self._wait(self.calibration_time)
+                    reading = self._measure_dmm(dmm)
+                    self.log.emit(f"{self.DMM_LABEL} reading = {reading}")
+
+                    self.log.emit(
+                        f"Channel {channel}: writing calibration data for {point}..."
+                    )
+                    self._write(psu, f"CAL:DATA {reading}")
+                    self._check_psu_error(psu)
+                    self._wait(2.0)
 
             self._checkpoint()
             self.log.emit("Saving calibration constants...")
@@ -236,10 +317,13 @@ class CalWorker(QThread):
                         self.log.emit(
                             f"Unable to disable calibration mode: {exception}"
                         )
-                try:
-                    psu.write(f"OUTPUT:STATE OFF,(@{self.channel})")
-                except Exception as exception:
-                    self.log.emit(f"Unable to disable PSU output: {exception}")
+                for channel in self.channels:
+                    try:
+                        psu.write(f"OUTPUT:STATE OFF,(@{channel})")
+                    except Exception as exception:
+                        self.log.emit(
+                            f"Unable to disable PSU channel {channel} output: {exception}"
+                        )
             for instrument in (dmm, psu):
                 if instrument is not None:
                     try:
@@ -254,9 +338,15 @@ class CalWorker(QThread):
 
 
 class VoltageCalibrationDialog(QDialog):
+    WORKER_CLASS = CalWorker
+    DMM_LABEL = "3458A"
+    DEFAULT_DMM_ADDRESS = "GPIB0::22::INSTR"
+
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Hornbill Voltage Calibration - 3458A")
+        self.setWindowTitle(
+            f"Hornbill Voltage Calibration - {self.DMM_LABEL}"
+        )
         self.resize(800, 520)
 
         form = QFormLayout()
@@ -264,21 +354,33 @@ class VoltageCalibrationDialog(QDialog):
         self.psu_input.setPlaceholderText("Enter Hornbill PSU VISA address")
         form.addRow("PSU Address:", self.psu_input)
 
-        self.dmm_input = QLineEdit("GPIB0::22::INSTR")
-        self.dmm_input.setPlaceholderText("Enter 3458A VISA address")
-        form.addRow("3458A Address:", self.dmm_input)
+        self.dmm_input = QLineEdit(self.DEFAULT_DMM_ADDRESS)
+        self.dmm_input.setPlaceholderText(
+            f"Enter {self.DMM_LABEL} VISA address"
+        )
+        form.addRow(f"{self.DMM_LABEL} Address:", self.dmm_input)
 
         self.pw_input = QLineEdit("PP8000A")
         self.pw_input.setEchoMode(QLineEdit.Password)
         form.addRow("Calibration Password:", self.pw_input)
 
-        self.channel_input = QSpinBox()
-        self.channel_input.setRange(1, 4)
-        self.channel_input.setValue(1)
-        form.addRow("Channel:", self.channel_input)
+        self.channel_input = QLineEdit("1")
+        self.channel_input.setPlaceholderText("Examples: 1 or 1,2,3,4")
+        form.addRow("Channels (csv):", self.channel_input)
 
         self.points_input = QLineEdit("P1,P2")
         form.addRow("Calibration Points:", self.points_input)
+
+        self.calibration_time_input = QDoubleSpinBox()
+        self.calibration_time_input.setRange(0.0, 3600.0)
+        self.calibration_time_input.setDecimals(1)
+        self.calibration_time_input.setSingleStep(5.0)
+        self.calibration_time_input.setValue(60.0)
+        self.calibration_time_input.setSuffix(" s")
+        self.calibration_time_input.setToolTip(
+            "Wait time after each P1/P2 calibration level before reading the DMM."
+        )
+        form.addRow("Calibration Time:", self.calibration_time_input)
 
         self.start_btn = QPushButton("Start Calibration")
         self.start_btn.clicked.connect(self.on_start)
@@ -309,7 +411,24 @@ class VoltageCalibrationDialog(QDialog):
         psu_addr = self.psu_input.text().strip()
         dmm_addr = self.dmm_input.text().strip()
         password = self.pw_input.text().strip()
-        channel = self.channel_input.value()
+        calibration_time = self.calibration_time_input.value()
+        channel_text = self.channel_input.text().strip()
+        try:
+            channels = self.WORKER_CLASS._normalize_channels(channel_text)
+        except (TypeError, ValueError):
+            QMessageBox.warning(
+                self,
+                "Invalid Channels",
+                "Enter channel numbers from 1 to 4, separated by commas.",
+            )
+            return
+        if not channels or any(channel < 1 or channel > 4 for channel in channels):
+            QMessageBox.warning(
+                self,
+                "Invalid Channels",
+                "Enter at least one channel from 1 to 4.",
+            )
+            return
         points = [
             point.strip()
             for point in self.points_input.text().split(",")
@@ -320,22 +439,24 @@ class VoltageCalibrationDialog(QDialog):
             QMessageBox.warning(
                 self,
                 "Missing Address",
-                "Provide both PSU and 3458A VISA addresses.",
+                f"Provide both PSU and {self.DMM_LABEL} VISA addresses.",
             )
             return
         if [point.upper() for point in points] != ["P1", "P2"]:
             QMessageBox.warning(
                 self,
                 "Invalid Points",
-                "The supported 3458A voltage calibration sequence is P1,P2.",
+                f"The supported {self.DMM_LABEL} voltage calibration "
+                "sequence is P1,P2.",
             )
             return
 
         reply = QMessageBox.warning(
             self,
             "Confirm Calibration",
-            "Calibration changes instrument constants. Verify wiring, channel, "
-            "and the 3458A connection before continuing.",
+            "Calibration changes instrument constants. Verify wiring, channels "
+            f"{', '.join(str(channel) for channel in channels)}, "
+            f"and the {self.DMM_LABEL} connection before continuing.",
             QMessageBox.Ok | QMessageBox.Cancel,
             QMessageBox.Cancel,
         )
@@ -349,8 +470,16 @@ class VoltageCalibrationDialog(QDialog):
             psu_addr = normalize_visa_address(psu_addr)
             dmm_addr = normalize_visa_address(dmm_addr)
             resource_manager = create_resource_manager()
-            psu = CalWorker._open_resource(resource_manager, psu_addr, "PSU")
-            dmm = CalWorker._open_resource(resource_manager, dmm_addr, "3458A")
+            psu = self.WORKER_CLASS._open_resource(
+                resource_manager,
+                psu_addr,
+                "PSU",
+            )
+            dmm = self.WORKER_CLASS._open_resource(
+                resource_manager,
+                dmm_addr,
+                self.DMM_LABEL,
+            )
         except Exception as exception:
             for instrument in (dmm, psu):
                 if instrument is not None:
@@ -369,14 +498,17 @@ class VoltageCalibrationDialog(QDialog):
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
         self.log.clear()
-        self.append_log("Starting 3458A voltage calibration...")
+        self.append_log(
+            f"Starting {self.DMM_LABEL} voltage calibration..."
+        )
 
-        self.worker = CalWorker(
+        self.worker = self.WORKER_CLASS(
             psu_addr,
             dmm_addr,
             password,
-            channel,
+            channels,
             points,
+            calibration_time=calibration_time,
             resource_manager=resource_manager,
             psu=psu,
             dmm=dmm,

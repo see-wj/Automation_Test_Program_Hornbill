@@ -18,6 +18,17 @@ OSC = TCPIP0::a-dx4054a-60122::inst0::INSTR
 DMM2 = USB0::0x2A8D::0x1301::MY53204794::0::INSTR
 ACSource = USB0::0x2A8D::0x3801::LPQ0000103::0::INSTR
 DAQ = USB0::0x2A8D::0x8601::MY59010677::0::INSTR
+PowerStudy_DUT = TCPIP0::p700-95640376::inst0::INSTR
+PowerStudy_ACSource = USB0::0x2A8D::0x1C02::JPFW002748::0::INSTR
+PowerStudy_DAQ = TCPIP0::K-DAQ973A-10677::inst0::INSTR
+PowerStudy_N3300A = GPIB1::1::INSTR
+PowerStudy_Excavator = USB0::0x2A8D::0xDA04::CN24350105::0::INSTR
+ExternalSource =
+// Add optional candidates for the same role with _2, _3, and so on.
+PSU_2 = USB0::0x2A8D::0xDC04::CN24360055::0::INSTR
+PSU_3= TCPIP0::p700-9564035b::inst0::INSTR
+// DMM_2 = USB0::0x2A8D::0x0501::SECOND_DMM::0::INSTR
+ELoad_2 = USB0::0x2A8D::0x5C02::MY62100065::0::INSTR
 DMM_Instrument = Keysight
 
 //General Settings
@@ -27,7 +38,16 @@ setFunction = Voltage
 VoltageRes = SLOW
 VoltageSense = EXT
 rshunt = 0.01
-Hornbill_Measurement_Command = DIAG
+Hornbill_Measurement_Command = SCPI
+SweepPoints = 100000
+
+//Sinking Test Settings
+External_Source_Positive_Current_Limit = 7
+External_Source_Negative_Current_Limit = -7
+slewrate = 10
+Sinking_Initial_Voltage = 20
+Sinking_Final_Voltage = 20
+Sinking_Voltage_Step_Size = 1
 
 //Error Settings
 //Voltage Gain and Offset 

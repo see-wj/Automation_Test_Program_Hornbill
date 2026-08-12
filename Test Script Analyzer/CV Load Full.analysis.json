@@ -1,0 +1,720 @@
+{
+  "source_path": "\\\\remus\\BID_RnD\\Hornbill\\Wei Jing\\CV Sweep Shu En\\CV Load Full.py",
+  "imports": [
+    "keyboard",
+    "numpy",
+    "pandas",
+    "pyvisa",
+    "signal",
+    "socket",
+    "sys",
+    "time"
+  ],
+  "classes": [],
+  "functions": [
+    "send_scpi_command",
+    "save_data",
+    "signal_handler"
+  ],
+  "visa_addresses": [
+    "USB0::0x2A8D::0x0201::MY57702174::0::INSTR",
+    "USB0::0x2A8D::0x3902::MY60260001::0::INSTR"
+  ],
+  "instrument_classes": [],
+  "instrument_roles": [
+    {
+      "variable": "CURR",
+      "role": "ELOAD",
+      "address": "USB0::0x2A8D::0x3902::MY60260001::0::INSTR",
+      "evidence": "VISA resource assigned at line 21"
+    },
+    {
+      "variable": "VOUT",
+      "role": "DMM",
+      "address": "USB0::0x2A8D::0x0201::MY57702174::0::INSTR",
+      "evidence": "VISA resource assigned at line 20"
+    },
+    {
+      "variable": "sock",
+      "role": "DUT/Hornbill",
+      "address": "p700-956404D4:5025",
+      "evidence": "TCP socket connected at line 110"
+    }
+  ],
+  "parameters": [
+    {
+      "line": 27,
+      "name": "curr_start",
+      "prompt": "Enter the starting current load (A):",
+      "conversion": "float"
+    },
+    {
+      "line": 32,
+      "name": "curr_step",
+      "prompt": "Enter the current load step interval (A):",
+      "conversion": "float"
+    },
+    {
+      "line": 37,
+      "name": "volt_start",
+      "prompt": "Enter the starting voltage (V):",
+      "conversion": "float"
+    },
+    {
+      "line": 42,
+      "name": "volt_step",
+      "prompt": "Enter the voltage step interval (V):",
+      "conversion": "float"
+    }
+  ],
+  "safety_limits": [
+    {
+      "line": 47,
+      "name": "power_lim",
+      "expression": "300"
+    }
+  ],
+  "sweeps": [
+    {
+      "line": 117,
+      "name": "sweep_values",
+      "start": "volt_start",
+      "stop": "61",
+      "step": "volt_step"
+    },
+    {
+      "line": 173,
+      "name": "curr_values",
+      "start": "curr_start",
+      "stop": "20.1",
+      "step": "curr_step"
+    },
+    {
+      "line": 188,
+      "name": "sweep_values",
+      "start": "volt_start",
+      "stop": "61",
+      "step": "volt_step"
+    }
+  ],
+  "outputs": [
+    {
+      "line": 67,
+      "operation": "to_excel",
+      "path": "C:/Users/shuepoh6/OneDrive - Keysight Technologies/Documents/raw_data.xlsx"
+    }
+  ],
+  "controls": [
+    {
+      "line": 30,
+      "kind": "process_exit",
+      "expression": "sys.exit(1)"
+    },
+    {
+      "line": 35,
+      "kind": "process_exit",
+      "expression": "sys.exit(1)"
+    },
+    {
+      "line": 40,
+      "kind": "process_exit",
+      "expression": "sys.exit(1)"
+    },
+    {
+      "line": 45,
+      "kind": "process_exit",
+      "expression": "sys.exit(1)"
+    },
+    {
+      "line": 103,
+      "kind": "process_exit",
+      "expression": "sys.exit(0)"
+    },
+    {
+      "line": 105,
+      "kind": "signal_handler",
+      "expression": "signal.signal(signal.SIGINT, signal_handler)"
+    },
+    {
+      "line": 120,
+      "kind": "keyboard_abort",
+      "expression": "a"
+    },
+    {
+      "line": 122,
+      "kind": "break",
+      "expression": "break"
+    },
+    {
+      "line": 127,
+      "kind": "break",
+      "expression": "break"
+    },
+    {
+      "line": 140,
+      "kind": "unbounded_poll",
+      "expression": "1"
+    },
+    {
+      "line": 147,
+      "kind": "break",
+      "expression": "break"
+    },
+    {
+      "line": 176,
+      "kind": "keyboard_abort",
+      "expression": "a"
+    },
+    {
+      "line": 178,
+      "kind": "break",
+      "expression": "break"
+    },
+    {
+      "line": 191,
+      "kind": "keyboard_abort",
+      "expression": "a"
+    },
+    {
+      "line": 193,
+      "kind": "break",
+      "expression": "break"
+    },
+    {
+      "line": 197,
+      "kind": "break",
+      "expression": "break"
+    },
+    {
+      "line": 210,
+      "kind": "unbounded_poll",
+      "expression": "1"
+    },
+    {
+      "line": 217,
+      "kind": "break",
+      "expression": "break"
+    }
+  ],
+  "data_fields": [
+    "Current Load (A)",
+    "Output Voltage (V)",
+    "Set Voltage (V)",
+    "VLOC (V)",
+    "VMON (V)"
+  ],
+  "commands": [
+    {
+      "line": 23,
+      "operation": "write",
+      "command": ":CONFigure:VOLTage:DC DEFault,MIN",
+      "receiver": "VOUT",
+      "mappings": []
+    },
+    {
+      "line": 24,
+      "operation": "write",
+      "command": ":TRIGger:SOURce BUS",
+      "receiver": "VOUT",
+      "mappings": [
+        "DMM_344XXA.setTriggerSource",
+        "Trigger.setSource",
+        "DMM_3458A.setTriggerMode"
+      ]
+    },
+    {
+      "line": 83,
+      "operation": "write",
+      "command": "OUTP OFF,(@2)",
+      "receiver": "CURR",
+      "mappings": [
+        "ELOAD_E367XXA.setOutputState",
+        "Output.setOutputState",
+        "Output.setOutputStateChannel",
+        "Output.SPModeConnection",
+        "Output.setOutputMode"
+      ]
+    },
+    {
+      "line": 85,
+      "operation": "send",
+      "command": "OUTP OFF,(@1)",
+      "receiver": "sock",
+      "mappings": [
+        "Output.setOutputState",
+        "Output.setOutputStateChannel",
+        "Hornbill.outputState",
+        "Output.SPModeConnection",
+        "Output.setOutputMode"
+      ]
+    },
+    {
+      "line": 111,
+      "operation": "send",
+      "command": "VOLT:SENSE:SOUR EXT,(@1)",
+      "receiver": "sock",
+      "mappings": [
+        "Voltage.setSenseModeMultipleChannel",
+        "Voltage.setSenseModeSingle",
+        "Voltage.setOutputVoltage"
+      ]
+    },
+    {
+      "line": 114,
+      "operation": "send",
+      "command": "VOLT 3,(@1)",
+      "receiver": "sock",
+      "mappings": [
+        "Voltage.setOutputVoltage",
+        "Voltage.OutputVoltageStepSize",
+        "Voltage.setACTripVoltage",
+        "Voltage.setPositiveSlew",
+        "Voltage.setSlewTracking"
+      ]
+    },
+    {
+      "line": 115,
+      "operation": "send",
+      "command": "OUTP ON,(@1)",
+      "receiver": "sock",
+      "mappings": [
+        "Output.setOutputState",
+        "Output.setOutputStateChannel",
+        "Hornbill.outputState",
+        "Output.SPModeConnection",
+        "Output.setOutputMode"
+      ]
+    },
+    {
+      "line": 130,
+      "operation": "send",
+      "command": "VOLT {v}, (@1)",
+      "receiver": "sock",
+      "mappings": [
+        "Voltage.setOutputVoltage",
+        "Voltage.OutputVoltageStepSize",
+        "Voltage.setACTripVoltage",
+        "Voltage.setPositiveSlew",
+        "Voltage.setSlewTracking"
+      ]
+    },
+    {
+      "line": 134,
+      "operation": "write",
+      "command": ":INITiate:IMMediate",
+      "receiver": "VOUT",
+      "mappings": [
+        "DMM_344XXA.initiate",
+        "Initiate.initiate"
+      ]
+    },
+    {
+      "line": 136,
+      "operation": "write",
+      "command": "*TRG",
+      "receiver": "VOUT",
+      "mappings": [
+        "DMM_3458A.setTriggerMode",
+        "DMM_344XXA.setTriggerSource",
+        "Trigger.setCount",
+        "Trigger.setSource",
+        "Trigger.setTriggerDelay"
+      ]
+    },
+    {
+      "line": 141,
+      "operation": "query_ascii_values",
+      "command": ":STATus:OPERation:CONDition?",
+      "receiver": "VOUT",
+      "mappings": [
+        "DMM_344XXA.operationCondition",
+        "Status.operationCondition",
+        "Status.statusOperation"
+      ]
+    },
+    {
+      "line": 143,
+      "operation": "query_ascii_values",
+      "command": ":FETCh?",
+      "receiver": "VOUT",
+      "mappings": [
+        "Fetch.query",
+        "Fetch.query2"
+      ]
+    },
+    {
+      "line": 150,
+      "operation": "socket_query",
+      "command": "DIAG:PEEK? 20,0",
+      "receiver": "sock",
+      "mappings": [
+        "Hornbill.measureReadbackVoltage",
+        "Hornbill.diag_PEEK_CurrentReadback_IMON_200mA_100k",
+        "Hornbill.diag_PEEK_CurrentReadback_IMON_200uA_100k",
+        "Hornbill.diag_PEEK_CurrentReadback_IMON_20mA_100k",
+        "Hornbill.diag_PEEK_CurrentReadback_IMON_2A_100k"
+      ]
+    },
+    {
+      "line": 152,
+      "operation": "socket_query",
+      "command": "DIAG:PEEK? 20,2",
+      "receiver": "sock",
+      "mappings": [
+        "Hornbill.measureReadbackVoltage",
+        "Hornbill.diag_PEEK_CurrentReadback_IMON_200mA_100k",
+        "Hornbill.diag_PEEK_CurrentReadback_IMON_200uA_100k",
+        "Hornbill.diag_PEEK_CurrentReadback_IMON_20mA_100k",
+        "Hornbill.diag_PEEK_CurrentReadback_IMON_2A_100k"
+      ]
+    },
+    {
+      "line": 168,
+      "operation": "send",
+      "command": "VOLT 3,(@1)",
+      "receiver": "sock",
+      "mappings": [
+        "Voltage.setOutputVoltage",
+        "Voltage.OutputVoltageStepSize",
+        "Voltage.setACTripVoltage",
+        "Voltage.setPositiveSlew",
+        "Voltage.setSlewTracking"
+      ]
+    },
+    {
+      "line": 169,
+      "operation": "write",
+      "command": "CURR 1,(@2)",
+      "receiver": "CURR",
+      "mappings": [
+        "Current.setOutputCurrent",
+        "ELOAD_E367XXA.setOutputCurrent",
+        "Current.OutputCurrentStepSize",
+        "Current.setCurrentLimit",
+        "Current.setCurrentMode"
+      ]
+    },
+    {
+      "line": 170,
+      "operation": "write",
+      "command": "OUTP ON,(@2)",
+      "receiver": "CURR",
+      "mappings": [
+        "ELOAD_E367XXA.setOutputState",
+        "Output.setOutputState",
+        "Output.setOutputStateChannel",
+        "Output.SPModeConnection",
+        "Output.setOutputMode"
+      ]
+    },
+    {
+      "line": 182,
+      "operation": "send",
+      "command": "VOLT 3,(@1)",
+      "receiver": "sock",
+      "mappings": [
+        "Voltage.setOutputVoltage",
+        "Voltage.OutputVoltageStepSize",
+        "Voltage.setACTripVoltage",
+        "Voltage.setPositiveSlew",
+        "Voltage.setSlewTracking"
+      ]
+    },
+    {
+      "line": 184,
+      "operation": "write",
+      "command": "SOUR:CURR:LEV:IMM:AMPL {i},(@2)",
+      "receiver": "CURR",
+      "mappings": []
+    },
+    {
+      "line": 200,
+      "operation": "send",
+      "command": "VOLT {v}, (@1)",
+      "receiver": "sock",
+      "mappings": [
+        "Voltage.setOutputVoltage",
+        "Voltage.OutputVoltageStepSize",
+        "Voltage.setACTripVoltage",
+        "Voltage.setPositiveSlew",
+        "Voltage.setSlewTracking"
+      ]
+    },
+    {
+      "line": 204,
+      "operation": "write",
+      "command": ":INITiate:IMMediate",
+      "receiver": "VOUT",
+      "mappings": [
+        "DMM_344XXA.initiate",
+        "Initiate.initiate"
+      ]
+    },
+    {
+      "line": 206,
+      "operation": "write",
+      "command": "*TRG",
+      "receiver": "VOUT",
+      "mappings": [
+        "DMM_3458A.setTriggerMode",
+        "DMM_344XXA.setTriggerSource",
+        "Trigger.setCount",
+        "Trigger.setSource",
+        "Trigger.setTriggerDelay"
+      ]
+    },
+    {
+      "line": 211,
+      "operation": "query_ascii_values",
+      "command": ":STATus:OPERation:CONDition?",
+      "receiver": "VOUT",
+      "mappings": [
+        "DMM_344XXA.operationCondition",
+        "Status.operationCondition",
+        "Status.statusOperation"
+      ]
+    },
+    {
+      "line": 213,
+      "operation": "query_ascii_values",
+      "command": ":FETCh?",
+      "receiver": "VOUT",
+      "mappings": [
+        "Fetch.query",
+        "Fetch.query2"
+      ]
+    },
+    {
+      "line": 220,
+      "operation": "socket_query",
+      "command": "DIAG:PEEK? 20,0",
+      "receiver": "sock",
+      "mappings": [
+        "Hornbill.measureReadbackVoltage",
+        "Hornbill.diag_PEEK_CurrentReadback_IMON_200mA_100k",
+        "Hornbill.diag_PEEK_CurrentReadback_IMON_200uA_100k",
+        "Hornbill.diag_PEEK_CurrentReadback_IMON_20mA_100k",
+        "Hornbill.diag_PEEK_CurrentReadback_IMON_2A_100k"
+      ]
+    },
+    {
+      "line": 222,
+      "operation": "socket_query",
+      "command": "DIAG:PEEK? 20,2",
+      "receiver": "sock",
+      "mappings": [
+        "Hornbill.measureReadbackVoltage",
+        "Hornbill.diag_PEEK_CurrentReadback_IMON_200mA_100k",
+        "Hornbill.diag_PEEK_CurrentReadback_IMON_200uA_100k",
+        "Hornbill.diag_PEEK_CurrentReadback_IMON_20mA_100k",
+        "Hornbill.diag_PEEK_CurrentReadback_IMON_2A_100k"
+      ]
+    },
+    {
+      "line": 238,
+      "operation": "write",
+      "command": "OUTP OFF,(@2)",
+      "receiver": "CURR",
+      "mappings": [
+        "ELOAD_E367XXA.setOutputState",
+        "Output.setOutputState",
+        "Output.setOutputStateChannel",
+        "Output.SPModeConnection",
+        "Output.setOutputMode"
+      ]
+    },
+    {
+      "line": 239,
+      "operation": "send",
+      "command": "OUTP OFF,(@1)",
+      "receiver": "sock",
+      "mappings": [
+        "Output.setOutputState",
+        "Output.setOutputStateChannel",
+        "Hornbill.outputState",
+        "Output.SPModeConnection",
+        "Output.setOutputMode"
+      ]
+    },
+    {
+      "line": 253,
+      "operation": "write",
+      "command": "OUTP OFF,(@2)",
+      "receiver": "CURR",
+      "mappings": [
+        "ELOAD_E367XXA.setOutputState",
+        "Output.setOutputState",
+        "Output.setOutputStateChannel",
+        "Output.SPModeConnection",
+        "Output.setOutputMode"
+      ]
+    },
+    {
+      "line": 254,
+      "operation": "send",
+      "command": "OUTP OFF,(@1)",
+      "receiver": "sock",
+      "mappings": [
+        "Output.setOutputState",
+        "Output.setOutputStateChannel",
+        "Hornbill.outputState",
+        "Output.SPModeConnection",
+        "Output.setOutputMode"
+      ]
+    }
+  ],
+  "delays": [
+    {
+      "line": 132,
+      "expression": "5"
+    },
+    {
+      "line": 135,
+      "expression": "1"
+    },
+    {
+      "line": 166,
+      "expression": "1"
+    },
+    {
+      "line": 183,
+      "expression": "1"
+    },
+    {
+      "line": 202,
+      "expression": "5"
+    },
+    {
+      "line": 205,
+      "expression": "1"
+    },
+    {
+      "line": 236,
+      "expression": "1"
+    }
+  ],
+  "loops": [
+    {
+      "line": 118,
+      "kind": "for",
+      "expression": "v in sweep_values"
+    },
+    {
+      "line": 140,
+      "kind": "while",
+      "expression": "1"
+    },
+    {
+      "line": 174,
+      "kind": "for",
+      "expression": "i in curr_values"
+    },
+    {
+      "line": 189,
+      "kind": "for",
+      "expression": "v in sweep_values"
+    },
+    {
+      "line": 210,
+      "kind": "while",
+      "expression": "1"
+    }
+  ],
+  "execution_flow": [
+    "Line 1: define function send_scpi_command()",
+    "Line 23: VOUT.write(:CONFigure:VOLTage:DC DEFault,MIN)",
+    "Line 24: VOUT.write(:TRIGger:SOURce BUS)",
+    "Line 27: request parameter curr_start (float)",
+    "Line 28: if curr_start < 0",
+    "Line 32: request parameter curr_step (float)",
+    "Line 33: if curr_step <= 0",
+    "Line 37: request parameter volt_start (float)",
+    "Line 38: if volt_start < 0",
+    "Line 42: request parameter volt_step (float)",
+    "Line 43: if volt_step <= 0",
+    "Line 56: define function save_data()",
+    "Line 58: if Cset and Vset and Vout and Vl and Vm",
+    "Line 74: define function signal_handler()",
+    "Line 82: if CURR",
+    "Line 83: CURR.write(OUTP OFF,(@2))",
+    "Line 84: if sock",
+    "Line 85: sock.send(OUTP OFF,(@1))",
+    "Line 91: if sock",
+    "Line 93: if CURR",
+    "Line 95: if VOUT",
+    "Line 97: if rm",
+    "Line 111: sock.send(VOLT:SENSE:SOUR EXT,(@1))",
+    "Line 114: sock.send(VOLT 3,(@1))",
+    "Line 115: sock.send(OUTP ON,(@1))",
+    "Line 118: for v in sweep_values",
+    "Line 120: if keyboard.is_pressed('a')",
+    "Line 126: if calculated_power > power_lim",
+    "Line 130: sock.send(VOLT {v}, (@1))",
+    "Line 132: wait 5",
+    "Line 134: VOUT.write(:INITiate:IMMediate)",
+    "Line 135: wait 1",
+    "Line 136: VOUT.write(*TRG)",
+    "Line 140: while 1",
+    "Line 141: VOUT.query_ascii_values(:STATus:OPERation:CONDition?)",
+    "Line 142: if status1 == 512 and VO is None",
+    "Line 143: VOUT.query_ascii_values(:FETCh?)",
+    "Line 146: if VO is not None",
+    "Line 150: sock.socket_query(DIAG:PEEK? 20,0)",
+    "Line 152: sock.socket_query(DIAG:PEEK? 20,2)",
+    "Line 162: if len(Cset) % 10 == 0",
+    "Line 166: wait 1",
+    "Line 168: sock.send(VOLT 3,(@1))",
+    "Line 169: CURR.write(CURR 1,(@2))",
+    "Line 170: CURR.write(OUTP ON,(@2))",
+    "Line 174: for i in curr_values",
+    "Line 176: if keyboard.is_pressed('a')",
+    "Line 182: sock.send(VOLT 3,(@1))",
+    "Line 183: wait 1",
+    "Line 184: CURR.write(SOUR:CURR:LEV:IMM:AMPL {i},(@2))",
+    "Line 189: for v in sweep_values",
+    "Line 191: if keyboard.is_pressed('a')",
+    "Line 196: if calculated_power > power_lim",
+    "Line 200: sock.send(VOLT {v}, (@1))",
+    "Line 202: wait 5",
+    "Line 204: VOUT.write(:INITiate:IMMediate)",
+    "Line 205: wait 1",
+    "Line 206: VOUT.write(*TRG)",
+    "Line 210: while 1",
+    "Line 211: VOUT.query_ascii_values(:STATus:OPERation:CONDition?)",
+    "Line 212: if status1 == 512 and VO is None",
+    "Line 213: VOUT.query_ascii_values(:FETCh?)",
+    "Line 216: if VO is not None",
+    "Line 220: sock.socket_query(DIAG:PEEK? 20,0)",
+    "Line 222: sock.socket_query(DIAG:PEEK? 20,2)",
+    "Line 232: if len(Cset) % 10 == 0",
+    "Line 236: wait 1",
+    "Line 238: CURR.write(OUTP OFF,(@2))",
+    "Line 239: sock.send(OUTP OFF,(@1))",
+    "Line 253: CURR.write(OUTP OFF,(@2))",
+    "Line 254: sock.send(OUTP OFF,(@1))"
+  ],
+  "warnings": [
+    "The script opens VISA resources directly; integration should use project session and cleanup helpers.",
+    "VISA resources are opened outside a cleanup-protected try/finally at line(s): 20, 21.",
+    "Socket communication has no detected timeout and may block indefinitely.",
+    "Unbounded while-loop polling requires timeout, delay, and abort checks at line(s): 140, 210.",
+    "Hardcoded VISA addresses should become GUI/configuration parameters.",
+    "Hardcoded socket host/port values should become configuration parameters.",
+    "Interactive input() parameters should become validated GUI fields.",
+    "2 command(s) have no likely Keysight.py mapping and require developer review.",
+    "No instrument error-query command was detected.",
+    "Bare except blocks hide cleanup or communication failures at line(s): 86, 99, 255, 263.",
+    "Hardcoded user-specific output paths should use RunContext storage.",
+    "Global keyboard polling should be replaced by TestWorker checkpoints."
+  ],
+  "integration_steps": [
+    "Confirm each inferred instrument role using *IDN? before selecting a driver.",
+    "Create a dedicated test class under DUT_Test_Scripts or src/instruments.",
+    "Review unmapped SCPI and add approved wrapper methods to Keysight.py.",
+    "Expose addresses, sweep values, limits, timing, and output options through configuration.",
+    "Use TestWorker checkpoints for pause, resume, abort, and bounded polling.",
+    "Define required instruments and safety limits in execution/preflight.py.",
+    "Write results through RunContext and the project report exporters.",
+    "Add deterministic simulation tests before real-hardware execution."
+  ]
+}

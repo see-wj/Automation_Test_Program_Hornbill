@@ -186,6 +186,14 @@ class EndToEndQueueTests(unittest.TestCase):
                 self.assertTrue((raw / "parameters.json").is_file())
                 self.assertTrue((raw / "config.csv").is_file())
                 self.assertTrue((raw / "error.csv").is_file())
+                self.assertTrue((raw / "analysis_summary.csv").is_file())
+                self.assertTrue(
+                    (raw / "analysis_loop_performance.csv").is_file()
+                )
+                self.assertTrue(
+                    (raw / "analysis_channel_comparison.csv").is_file()
+                )
+                self.assertTrue((raw / "analysis_extremes.csv").is_file())
                 self.assertEqual(len(list(raw.glob("realtime_voltage_data_*.csv"))), 1)
                 self.assertTrue((charts / "Chart.png").is_file())
                 self.assertTrue((charts / "Chart2.png").is_file())

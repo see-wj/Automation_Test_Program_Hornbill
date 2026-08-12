@@ -13,6 +13,7 @@ for import_path in (SRC, ROOT):
     if str(import_path) not in sys.path:
         sys.path.insert(0, str(import_path))
 
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication
 
 import GUI
@@ -23,6 +24,7 @@ from ui.documentation_tab import (
     build_remaining_test_patterns,
 )
 from ui.keysight_command_tab import KeysightCommandTab
+from ui.test_script_assistant_tab import TestScriptAssistantTab
 
 
 class GuiDocumentationTests(unittest.TestCase):
@@ -50,6 +52,43 @@ class GuiDocumentationTests(unittest.TestCase):
         self.assertIn("Adding a New Bundle Test Script", content)
         self.assertIn("Calibration is work in progress", content)
         self.assertIn("VI_ERROR_LIBRARY_NFOUND", content)
+        self.assertIn("Bundle Test Data Analysis", content)
+        self.assertIn("Set voltage and set current", content)
+        self.assertIn("Standard deviation", content)
+        self.assertIn("Channel-to-channel comparison", content)
+        self.assertIn("Choosing an analysis type", content)
+        self.assertIn("Analyze Existing Results", content)
+        self.assertIn("Compare Two Runs", content)
+        self.assertIn("Detailed statistical mathematics reference", content)
+        self.assertIn("e_prog = V_ref - V_set", content)
+        self.assertIn("Mean equivalence (TOST confidence-interval rule)", content)
+        self.assertIn("Practical difference threshold", content)
+        self.assertIn("not a p-value", content)
+        self.assertIn("Loop stability detection algorithm", content)
+        self.assertIn("Stable From Loop", content)
+        self.assertIn("Confirmed At Loop", content)
+        self.assertIn("overall DUT stable", content)
+        self.assertIn("Automated text and error-trend analysis", content)
+        self.assertIn("Movement relative to zero", content)
+        self.assertIn("analysis_trend_summary.csv", content)
+        self.assertIn("analysis_trend_report.txt", content)
+        self.assertIn("Run / Channel Comparison", content)
+        self.assertIn("analysis_comparison_report.txt", content)
+        self.assertIn("Recommended Action", content)
+        self.assertIn("Comparison Trend", content)
+        self.assertIn("comparison_trend.png", content)
+        self.assertIn("analysis_stability_summary.csv", content)
+        self.assertIn("Hornbill sinking test", content)
+        self.assertIn("External Source/Sink PSU", content)
+        self.assertIn("replaces any previous selection", content)
+        self.assertIn("Files are read in place", content)
+        self.assertIn("Export Analysis Results", content)
+        self.assertIn("analysis_manifest.json", content)
+        self.assertIn("PSU_2", content)
+        self.assertIn("DMM_2", content)
+        self.assertIn("Software update workflow", content)
+        self.assertIn("update_manifest.json", content)
+        self.assertIn("SHA-256", content)
 
     def test_documentation_search_wraps_to_first_match(self):
         tab = self.make_tab()
@@ -151,13 +190,23 @@ class GuiDocumentationTests(unittest.TestCase):
         window = GUI.MainWindow()
         self.addCleanup(self.dispose_widget, window)
 
-        self.assertEqual(window.tab_widget.count(), 6)
+        self.assertEqual(window.tab_widget.count(), 8)
         self.assertEqual(window.tab_widget.tabText(3), "Documentation")
         self.assertIsInstance(window.tab_widget.widget(3), ProgramDocumentationTab)
         self.assertEqual(window.tab_widget.tabText(4), "Test Patterns")
         self.assertIsInstance(window.tab_widget.widget(4), TestPatternsTab)
         self.assertEqual(window.tab_widget.tabText(5), "Keysight Commands")
+        self.assertEqual(window.tab_widget.tabText(6), "Script Assistant")
+        self.assertEqual(window.tab_widget.tabText(7), "Software Update")
+        self.assertEqual(window.tab_widget.elideMode(), Qt.ElideNone)
+        self.assertTrue(window.tab_widget.usesScrollButtons())
+        self.assertFalse(window.tab_widget.tabBar().expanding())
+        self.assertEqual(
+            window.tab_widget.tabToolTip(5),
+            "Keysight Commands",
+        )
         self.assertIsInstance(window.tab_widget.widget(5), KeysightCommandTab)
+        self.assertIsInstance(window.tab_widget.widget(6), TestScriptAssistantTab)
         self.assertFalse(hasattr(window.tab_Documentation, "pattern_graphs"))
 
         window.tab_widget.setCurrentIndex(3)
@@ -166,8 +215,15 @@ class GuiDocumentationTests(unittest.TestCase):
         self.assertTrue(window.QButton_Widget.isHidden())
         window.tab_widget.setCurrentIndex(5)
         self.assertTrue(window.QButton_Widget.isHidden())
+        window.tab_widget.setCurrentIndex(6)
+        self.assertTrue(window.QButton_Widget.isHidden())
         window.tab_widget.setCurrentIndex(0)
         self.assertFalse(window.QButton_Widget.isHidden())
+        self.assertEqual(window.QButton_Widget.text(), "Open Bundle Test")
+        window.tab_widget.setCurrentIndex(1)
+        self.assertEqual(window.QButton_Widget.text(), "Open Screenshot Tool")
+        window.tab_widget.setCurrentIndex(2)
+        self.assertEqual(window.QButton_Widget.text(), "Open Selected Workflow")
 
 
 if __name__ == "__main__":

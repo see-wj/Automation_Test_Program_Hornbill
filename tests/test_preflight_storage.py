@@ -39,6 +39,95 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(requirements, {"PSU", "DMM", "ELoad"})
 
+    def test_ac_source_mode_requires_source_and_valid_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parameters = valid_voltage_parameters(directory)
+            parameters.update(
+                AC_Supply_Type="AC Source",
+                ACSource="USB0::AC::INSTR",
+                AC_CurrentLimit=2,
+                AC_VoltageOutput=230,
+                Frequency=50,
+            )
+            errors, requirements = validate_preflight(
+                parameters,
+                {"VoltageAccuracy": True},
+            )
+
+        self.assertEqual(errors, [])
+        self.assertIn("ACSource", requirements)
+
+    def test_plug_mode_rejects_automated_line_regulation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parameters = valid_voltage_parameters(directory)
+            parameters.update(
+                AC_Supply_Type="Plug",
+                V_Rating=30,
+                I_Rating=10,
+                P_Rating=50,
+                Load_Programming_Error_Gain=0,
+                Load_Programming_Error_Offset=0,
+            )
+            errors, requirements = validate_preflight(
+                parameters,
+                {"VoltageLineRegulation": True},
+            )
+
+        self.assertTrue(any("requires AC Supply Type" in error for error in errors))
+        self.assertNotIn("ACSource", requirements)
+
+    def test_accepts_hornbill_static_voltage_accuracy_without_eload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parameters = valid_voltage_parameters(directory)
+            parameters.update(DUT="Hornbill", ELoad="None")
+            errors, requirements = validate_preflight(
+                parameters,
+                {
+                    "VoltageAccuracy": True,
+                    "CurrentStatic(VoltageChange)": True,
+                },
+            )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(requirements, {"PSU", "DMM"})
+
+    def test_rejects_no_eload_for_load_change_test(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parameters = valid_voltage_parameters(directory)
+            parameters.update(DUT="Hornbill", ELoad="None")
+            errors, requirements = validate_preflight(
+                parameters,
+                {
+                    "VoltageAccuracy": True,
+                    "CurrentChange(LoadChange)": True,
+                },
+            )
+
+        self.assertIn("ELoad", requirements)
+        self.assertTrue(
+            any("requires an electronic load" in error for error in errors)
+        )
+
+    def test_accepts_hornbill_no_eload_scope_capture_with_oscilloscope(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parameters = valid_voltage_parameters(directory)
+            parameters.update(
+                DUT="Hornbill",
+                ELoad="None",
+                OSC="USB0::SCOPE::INSTR",
+                OSC_Channel=1,
+            )
+            errors, requirements = validate_preflight(
+                parameters,
+                {
+                    "VoltageAccuracy": True,
+                    "CurrentStatic(VoltageChange)withOscilloscope": True,
+                },
+            )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(requirements, {"PSU", "DMM", "OSC"})
+
     def test_rejects_duplicate_instrument_addresses(self):
         with tempfile.TemporaryDirectory() as directory:
             parameters = valid_voltage_parameters(directory)
@@ -96,6 +185,51 @@ class PreflightTests(unittest.TestCase):
 
         self.assertEqual(errors, [])
         self.assertIn("DAQ", requirements)
+
+    def test_sinking_test_requires_external_source_and_safe_limits(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parameters = valid_voltage_parameters(directory)
+            parameters.update(
+                DUT="Hornbill",
+                ExternalSource="TCPIP0::SOURCE::INSTR",
+                External_Source_Positive_Current_Limit=7,
+                External_Source_Negative_Current_Limit=-7,
+                slewrate=1,
+            )
+            errors, requirements = validate_preflight(
+                parameters,
+                {
+                    "VoltageAccuracy": True,
+                    "SinkingTest": True,
+                },
+            )
+
+        self.assertEqual(errors, [])
+        self.assertIn("ExternalSource", requirements)
+
+    def test_sinking_test_cannot_use_none_eload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parameters = valid_voltage_parameters(directory)
+            parameters.update(
+                DUT="Hornbill",
+                ELoad="None",
+                ExternalSource="TCPIP0::SOURCE::INSTR",
+                External_Source_Positive_Current_Limit=7,
+                External_Source_Negative_Current_Limit=-7,
+                slewrate=1,
+            )
+            errors, requirements = validate_preflight(
+                parameters,
+                {
+                    "VoltageAccuracy": True,
+                    "SinkingTest": True,
+                },
+            )
+
+        self.assertIn("ELoad", requirements)
+        self.assertTrue(
+            any("requires an electronic load" in error for error in errors)
+        )
 
 
 class RunStorageTests(unittest.TestCase):

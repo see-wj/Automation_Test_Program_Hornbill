@@ -8,9 +8,8 @@ from reporting.data import (
     datatoCSV_OVP_Accuracy,
     datatoCSV_Programming_Response,
 )
-from DUT_Test_Scripts.Dolphin.DUT_Test import NewVoltageMeasurement
+from DUT_Test_Scripts.Dolphin.DUT_Test import LineRegulation, NewVoltageMeasurement
 from DUT_Test_Scripts.Dolphin.Dolphin_DUT_Test_No_ELoad_No_DMM import (
-    LineRegulation,
     NewLoadRegulation,
     OVP_Test,
     ProgrammingResponse,
@@ -19,6 +18,11 @@ from DUT_Test_Scripts.Dolphin.Dolphin_DUT_Test_No_ELoad_No_DMM import (
 from DUT_Test_Scripts.Hornbill.Hornbill_DUT_Test_With_ELoad import (
     HornbillVoltageMeasurementwithELoad,
     HornbillVoltageMeasurementwithELoadwithOscilloscope,
+    HornbillVoltageMeasurementwithSinkBox_External_PSU_Capable_Source_and_Sink,
+)
+from DUT_Test_Scripts.Hornbill.Hornbill_DUT_Test_No_ELoad import (
+    HornbillVoltageMeasurementNoELoad,
+    HornbillVoltageMeasurementNoELoadWithOscilloscope,
 )
 
 
@@ -40,6 +44,21 @@ HORNBILL_VOLTAGE_ACCURACY_RUNNERS = {
     ),
     "CurrentStatic(VoltageChange)withOscilloscope": (
         HornbillVoltageMeasurementwithELoadwithOscilloscope.Execute_Voltage_Accuracy_Current_Static
+    ),
+}
+
+HORNBILL_NO_ELOAD_VOLTAGE_ACCURACY_RUNNERS = {
+    "CurrentStatic(VoltageChange)": (
+        HornbillVoltageMeasurementNoELoad.Execute_Voltage_Accuracy_Current_Static
+    ),
+    "CurrentStatic(VoltageChange)withOscilloscope": (
+        HornbillVoltageMeasurementNoELoadWithOscilloscope.Execute_Voltage_Accuracy_Current_Static
+    ),
+}
+
+HORNBILL_SINKING_VOLTAGE_ACCURACY_RUNNERS = {
+    "SinkingTest": (
+        HornbillVoltageMeasurementwithSinkBox_External_PSU_Capable_Source_and_Sink.Execute_Voltage_Accuracy_Current_Static
     ),
 }
 
@@ -149,6 +168,16 @@ class VoltageTestExecutor:
         )
 
     def run_hornbill_accuracy(self, loop_index):
+        if self.worker.checkbox_states.get("SinkingTest"):
+            return self.run_selected_accuracy(
+                loop_index,
+                HORNBILL_SINKING_VOLTAGE_ACCURACY_RUNNERS,
+            )
+        if str(self.worker.dict.get("ELoad", "")).strip().lower() == "none":
+            return self.run_selected_accuracy(
+                loop_index,
+                HORNBILL_NO_ELOAD_VOLTAGE_ACCURACY_RUNNERS,
+            )
         return self.run_selected_accuracy(
             loop_index,
             HORNBILL_VOLTAGE_ACCURACY_RUNNERS,

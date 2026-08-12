@@ -50,6 +50,13 @@ class ConfigurationTests(unittest.TestCase):
             "DMM": "DMM",
             "ELoad": "ELoad",
             "DAQ": "USB::DAQ",
+            "ExternalSource": "TCPIP0::SOURCE::INSTR",
+            "External_Source_Positive_Current_Limit": 7,
+            "External_Source_Negative_Current_Limit": -7,
+            "slewrate": 2,
+            "Sinking_Initial_Voltage": 10,
+            "Sinking_Final_Voltage": 20,
+            "Sinking_Voltage_Step_Size": 5,
             "ELoad_Channel": 1,
             "PSU_Channel": [1],
             "VoltageSense": "2-wire",
@@ -59,6 +66,7 @@ class ConfigurationTests(unittest.TestCase):
             "DMM_Model": "DMM",
             "ELoad_Model": "ELoad",
             "Hornbill_Measurement_Command": "SCPI",
+            "SweepPoints": 100000,
             "Relay_Control": "Voltage Relay (Channel 3)",
             "Range": "Auto",
             "Aperture": 1,
@@ -66,6 +74,12 @@ class ConfigurationTests(unittest.TestCase):
             "inputZ": "Auto",
             "UpTime": 0,
             "DownTime": 0,
+            "AC_Supply_Type": "Plug",
+            "ACSource": "USB0::AC::INSTR",
+            "AC_CurrentLimit": 2,
+            "AC_VoltageOutput": 230,
+            "Frequency": 50,
+            "Line_Reg_Range": [100, 115, 230],
             "rshunt": 0.1,
             "DMM2": "DMM2",
             "OSC": "OSC",
@@ -88,9 +102,34 @@ class ConfigurationTests(unittest.TestCase):
 
         self.assertEqual(result["DUT"], "Dolphin")
         self.assertEqual(result["InputZ"], "Auto")
+        self.assertEqual(result["SweepPoints"], 100000)
         self.assertEqual(result["Hornbill_Measurement_Command"], "SCPI")
         self.assertEqual(result["Relay_Control"], "Voltage Relay (Channel 3)")
+        self.assertEqual(result["AC_Supply_Type"], "Plug")
+        self.assertNotIn("ACSource", result)
         self.assertNotIn("DMM2", result)
+
+    def test_adds_ac_source_fields_when_programmable_source_selected(self):
+        self.parameters["AC_Supply_Type"] = "AC Source"
+
+        result = build_test_parameters(
+            self.parameters,
+            {"VoltageAccuracy": True},
+        )
+
+        self.assertEqual(result["ACSource"], "USB0::AC::INSTR")
+        self.assertEqual(result["AC_CurrentLimit"], 2)
+        self.assertEqual(result["AC_VoltageOutput"], 230)
+        self.assertEqual(result["Frequency"], 50)
+
+    def test_line_regulation_adds_range_but_plug_does_not_add_address(self):
+        result = build_test_parameters(
+            self.parameters,
+            {"VoltageLineRegulation": True},
+        )
+
+        self.assertEqual(result["Line_Reg_Range"], [100, 115, 230])
+        self.assertNotIn("ACSource", result)
 
     def test_adds_current_only_fields(self):
         result = build_test_parameters(self.parameters, {"Current_Test": True})
@@ -114,6 +153,29 @@ class ConfigurationTests(unittest.TestCase):
         result = build_test_parameters(self.parameters, {"Temperature": True})
 
         self.assertEqual(result["DAQ"], "USB::DAQ")
+
+    def test_adds_external_source_fields_for_sinking_test(self):
+        result = build_test_parameters(
+            self.parameters,
+            {"VoltageAccuracy": True, "SinkingTest": True},
+        )
+
+        self.assertEqual(
+            result["ExternalSource"],
+            "TCPIP0::SOURCE::INSTR",
+        )
+        self.assertEqual(
+            result["External_Source_Positive_Current_Limit"],
+            7,
+        )
+        self.assertEqual(
+            result["External_Source_Negative_Current_Limit"],
+            -7,
+        )
+        self.assertEqual(result["slewrate"], 2)
+        self.assertEqual(result["Sinking_Initial_Voltage"], 10)
+        self.assertEqual(result["Sinking_Final_Voltage"], 20)
+        self.assertEqual(result["Sinking_Voltage_Step_Size"], 5)
 
     def test_snapshot_is_independent_from_gui_parameters(self):
         self.parameters["PSU_Channel"] = [1]

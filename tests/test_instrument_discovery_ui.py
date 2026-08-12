@@ -29,6 +29,15 @@ class FakeAddressWidget:
     def addItem(self, value):
         self.items.append(value)
 
+    def insertItem(self, index, value):
+        self.items.insert(index, value)
+
+    def findText(self, value):
+        try:
+            return self.items.index(value)
+        except ValueError:
+            return -1
+
     def setCurrentIndex(self, index):
         self.current_index = index
 
@@ -103,6 +112,44 @@ class InstrumentDiscoveryUiTests(unittest.TestCase):
         )
 
         self.assertEqual(dmm_widget.current_index, 1)
+
+    def test_unavailable_eload_receives_selected_none_option(self):
+        result = DiscoveryResult(
+            addresses=["USB0::PSU::INSTR"],
+            identities=["VENDOR,PSU"],
+            roles={"PSU": "USB0::PSU::INSTR"},
+        )
+        psu_widget = FakeAddressWidget()
+        eload_widget = FakeAddressWidget()
+
+        present_discovery_result(
+            result,
+            address_widgets=(psu_widget, eload_widget),
+            role_widgets={"PSU": psu_widget, "ELOAD": eload_widget},
+            unavailable_role_items={"ELOAD": "None"},
+        )
+
+        self.assertEqual(eload_widget.items[0], "None")
+        self.assertEqual(eload_widget.currentText(), "None")
+
+    def test_available_eload_does_not_add_none_option(self):
+        address = "USB0::ELOAD::INSTR"
+        result = DiscoveryResult(
+            addresses=[address],
+            identities=["VENDOR,ELOAD"],
+            roles={"ELOAD": address},
+        )
+        eload_widget = FakeAddressWidget()
+
+        present_discovery_result(
+            result,
+            address_widgets=(eload_widget,),
+            role_widgets={"ELOAD": eload_widget},
+            unavailable_role_items={"ELOAD": "None"},
+        )
+
+        self.assertEqual(eload_widget.items, [address])
+        self.assertEqual(eload_widget.currentText(), address)
 
 
 if __name__ == "__main__":

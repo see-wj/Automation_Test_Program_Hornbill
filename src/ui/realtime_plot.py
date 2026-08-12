@@ -3,6 +3,13 @@
 from dataclasses import dataclass, field
 
 
+def report_percentage_error(error, programming_upper_bound):
+    """Return error as a percentage of the report specification limit."""
+    if programming_upper_bound == 0:
+        return 0.0 if error == 0 else float("inf")
+    return (error / programming_upper_bound) * 100.0
+
+
 @dataclass(frozen=True)
 class RealtimeMeasurement:
     set_voltage: float

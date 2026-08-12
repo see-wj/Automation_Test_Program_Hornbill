@@ -1,6 +1,7 @@
 """VISA instrument discovery and model-to-role assignment."""
 
 import ipaddress
+import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -25,7 +26,13 @@ CONFIGURED_INSTRUMENT_ROLES = {
     "OSC": "SCOPE",
     "ACSource": "ACSOURCE",
     "DAQ": "DAQ",
+    "ExternalSource": "EXTERNALSOURCE",
 }
+CONFIGURED_ROLE_PATTERN = re.compile(
+    r"^(PSU|DMM|DMM2|ELOAD|OSC|ACSOURCE|DAQ|EXTERNALSOURCE)"
+    r"(?:_([2-9]\d*))?$",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -127,8 +134,11 @@ def get_configured_visa_resources(
         set(enabled_transports) if enabled_transports is not None else None
     )
     configured_instruments = []
-    for config_key, role in CONFIGURED_INSTRUMENT_ROLES.items():
-        address = configured_values.get(config_key, "").strip()
+    for config_key, configured_address in configured_values.items():
+        role = _configured_instrument_role(config_key)
+        if role is None:
+            continue
+        address = configured_address.strip()
         if not address:
             continue
         transport = _address_transport(address)
@@ -146,7 +156,7 @@ def get_configured_visa_resources(
     try:
         for role, address in configured_instruments:
             if address in identities_by_address:
-                result.roles[role] = address
+                result.roles.setdefault(role, address)
                 continue
             instrument = None
             try:
@@ -170,7 +180,7 @@ def get_configured_visa_resources(
                 identities_by_address[address] = identity
                 result.addresses.append(address)
                 result.identities.append(identity)
-                result.roles[role] = address
+                result.roles.setdefault(role, address)
             except Exception as exception:
                 print_console_safe(
                     f"Configured {role} unavailable at {address}: {exception}"
@@ -187,6 +197,18 @@ def get_configured_visa_resources(
         except Exception:
             pass
     return result
+
+
+def _configured_instrument_role(config_key):
+    match = CONFIGURED_ROLE_PATTERN.fullmatch(str(config_key).strip())
+    if match is None:
+        return None
+    base_key = match.group(1).upper()
+    normalized_keys = {
+        key.upper(): role
+        for key, role in CONFIGURED_INSTRUMENT_ROLES.items()
+    }
+    return normalized_keys[base_key]
 
 
 def _discover_resources(

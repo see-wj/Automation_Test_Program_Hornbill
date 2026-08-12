@@ -57,8 +57,22 @@ class RunContextTests(unittest.TestCase):
 
         self.assertEqual(tuple(first_rows[0]), REALTIME_COLUMNS)
         self.assertEqual(len(first_rows[0]), len(first_rows[1]))
-        self.assertEqual(first_rows[1][1], "0")
-        self.assertEqual(second_rows[1][1], "100")
+        self.assertEqual(first_rows[1][1], "1")
+        self.assertEqual(first_rows[1][3], "0")
+        self.assertEqual(second_rows[1][3], "100")
+
+    def test_realtime_csv_records_loop_and_channel_context(self):
+        with tempfile.TemporaryDirectory() as directory:
+            context = self._create_context(directory, "first", "Dolphin")
+            path = context.open_realtime_csv("first")
+            context.set_measurement_context(2, 4)
+            context.write_realtime_row(range(15))
+            context.close()
+
+            with path.open(newline="", encoding="utf-8") as csv_file:
+                rows = list(csv.reader(csv_file))
+
+        self.assertEqual(rows[1][1:3], ["2", "4"])
 
     def test_realtime_csv_rejects_rows_with_wrong_width(self):
         with tempfile.TemporaryDirectory() as directory:

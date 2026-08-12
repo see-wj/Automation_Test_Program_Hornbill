@@ -1,5 +1,6 @@
 import threading
 import unittest
+from datetime import datetime
 from unittest.mock import patch
 
 import GUI
@@ -9,6 +10,14 @@ from execution import test_worker
 from execution import voltage_test_executor
 from DUT_Test_Scripts.Hornbill.Hornbill_DUT_Test_With_ELoad import (
     HornbillVoltageMeasurementwithELoadwithOscilloscope,
+    HornbillVoltageMeasurementwithSinkBox_External_PSU_Capable_Source_and_Sink,
+    _configure_external_source,
+    _sinking_voltage_points,
+    _start_keysight_eload_to_psu_mode,
+)
+from DUT_Test_Scripts.Hornbill.Hornbill_DUT_Test_No_ELoad import (
+    HornbillVoltageMeasurementNoELoad,
+    HornbillVoltageMeasurementNoELoadWithOscilloscope,
 )
 from DUT_Test_Scripts.instrument_shutdown import ShutdownResult
 from SCPI_Library.instrument_errors import TestExecutionError as ExecutionFailure
@@ -28,6 +37,124 @@ def create_worker():
 
 
 class WorkerControlTests(unittest.TestCase):
+    def test_sinking_voltage_points_include_requested_final_point(self):
+        points = _sinking_voltage_points(
+            {
+                "Sinking_Initial_Voltage": "10",
+                "Sinking_Final_Voltage": "20",
+                "Sinking_Voltage_Step_Size": "4",
+            }
+        )
+
+        self.assertEqual(points, (10.0, 14.0, 18.0, 20.0))
+
+    def test_sinking_voltage_points_reject_invalid_sweep(self):
+        with self.assertRaisesRegex(ValueError, "greater than or equal"):
+            _sinking_voltage_points(
+                {
+                    "Sinking_Initial_Voltage": "20",
+                    "Sinking_Final_Voltage": "10",
+                    "Sinking_Voltage_Step_Size": "1",
+                }
+            )
+
+    def test_sinking_eload_starts_at_configured_voltage(self):
+        class ELoad:
+            def __init__(self):
+                self.calls = []
+
+            def setEmulationMode(self, value):
+                self.calls.append(("mode", value))
+
+            def setFunction(self, value):
+                self.calls.append(("function", value))
+
+            def setSlewRatePOS(self, value):
+                self.calls.append(("slew_pos", value))
+
+            def setSlewRateNEG(self, value):
+                self.calls.append(("slew_neg", value))
+
+            def setSlewRising(self, value):
+                self.calls.append(("rise", value))
+
+            def setSlewFalling(self, value):
+                self.calls.append(("fall", value))
+
+            def setOutputCurrent(self, value):
+                self.calls.append(("current", value))
+
+            def setOutputVoltage(self, value):
+                self.calls.append(("voltage", value))
+
+            def setOutputState(self, value):
+                self.calls.append(("output", value))
+
+        eload = ELoad()
+        configuration = {
+            "ELoad": "USB0::ELOAD::INSTR",
+            "slewrate": "10",
+            "minCurrent": "0",
+            "Sinking_Initial_Voltage": "12.5",
+            "Sinking_Final_Voltage": "20",
+            "Sinking_Voltage_Step_Size": "2.5",
+        }
+
+        with patch(
+            "DUT_Test_Scripts.Hornbill."
+            "Hornbill_DUT_Test_With_ELoad.WAI"
+        ):
+            _start_keysight_eload_to_psu_mode(eload, configuration)
+
+        self.assertIn(("voltage", 12.5), eload.calls)
+        self.assertEqual(eload.calls[-1], ("output", "ON"))
+
+    def test_sinking_external_source_uses_supported_keysight_commands(self):
+        class ExternalSource:
+            def __init__(self, address):
+                self.address = address
+                self.calls = []
+
+            def setSYSTEMEMULationMode(self, mode):
+                self.calls.append(("mode", mode))
+
+            def setPOSCurrentLimit(self, value):
+                self.calls.append(("positive", value))
+
+            def setNEGCurrentLimit(self, value):
+                self.calls.append(("negative", value))
+
+            def setOutputVoltage(self, value):
+                self.calls.append(("voltage", value))
+
+            def setOutputState(self, state):
+                self.calls.append(("output", state))
+
+        with patch(
+            "DUT_Test_Scripts.Hornbill."
+            "Hornbill_DUT_Test_With_ELoad.WAI"
+        ):
+            source = _configure_external_source(
+                ExternalSource,
+                {
+                    "ExternalSource": "TCPIP0::SOURCE::INSTR",
+                    "External_Source_Positive_Current_Limit": "7",
+                    "External_Source_Negative_Current_Limit": "-7",
+                },
+            )
+
+        self.assertEqual(source.address, "TCPIP0::SOURCE::INSTR")
+        self.assertEqual(
+            source.calls,
+            [
+                ("mode", "SOUR"),
+                ("positive", 7.0),
+                ("negative", -7.0),
+                ("voltage", 80),
+                ("output", "ON"),
+            ],
+        )
+
     def test_gui_reexports_worker_types(self):
         self.assertIs(GUI.TestWorker, TestWorker)
         self.assertIs(GUI.TestState, TestState)
@@ -86,11 +213,30 @@ class WorkerControlTests(unittest.TestCase):
         worker = create_worker()
         worker.checkbox_states = {"Temperature": True}
         worker.dict = {"DAQ": "USB0::DAQ::INSTR"}
-        sample = type("Sample", (), {"status_text": lambda self: "Temperature: 20 C"})()
+        sample = type(
+            "Sample",
+            (),
+            {
+                "timestamp": datetime.now(),
+                "readings": {101: 20.0},
+                "status_text": lambda self: "Temperature: 20 C",
+            },
+        )()
+        emitted = []
+        worker.temperature_data.connect(
+            lambda measured_sample, loop_index: emitted.append(
+                (measured_sample, loop_index)
+            )
+        )
 
-        with patch("execution.test_worker.TemperatureMeasurement") as monitor_class:
+        with patch(
+            "execution.test_worker.TemperatureMeasurement"
+        ) as monitor_class, patch(
+            "execution.test_worker.threading.Thread"
+        ) as thread_class:
             monitor = monitor_class.return_value
             monitor.measure.return_value = sample
+            thread_class.return_value.is_alive.return_value = False
             worker._start_temperature_monitor()
             worker._record_temperature(2)
             worker._close_temperature_monitor()
@@ -101,6 +247,55 @@ class WorkerControlTests(unittest.TestCase):
         )
         monitor.configure.assert_called_once_with()
         monitor.measure.assert_called_once_with(2)
+        monitor.close.assert_called_once_with()
+        thread_class.return_value.start.assert_called_once_with()
+        self.assertEqual(emitted, [(sample, 2)])
+
+    def test_temperature_monitor_samples_while_dut_test_is_running(self):
+        worker = TestWorker(
+            {"Temperature": True},
+            {"DAQ": "USB0::DAQ::INSTR"},
+            Parameters(DUT="Unknown", noofloop=1),
+        )
+        sample = type(
+            "Sample",
+            (),
+            {
+                "timestamp": datetime.now(),
+                "readings": {101: 22.5},
+                "status_text": lambda self: "Temperature: 22.5 C",
+            },
+        )()
+        measurement_seen = threading.Event()
+
+        with patch(
+            "execution.test_worker.TemperatureMeasurement"
+        ) as monitor_class, patch.object(
+            worker, "close_visa_sessions"
+        ), patch.object(
+            worker, "safe_shutdown"
+        ), patch(
+            "execution.test_worker.begin_visa_session_scope"
+        ):
+            monitor = monitor_class.return_value
+
+            def measure(loop_index):
+                measurement_seen.set()
+                return sample
+
+            monitor.measure.side_effect = measure
+
+            def dispatch(_loop_index):
+                self.assertTrue(measurement_seen.wait(timeout=1))
+
+            with patch.object(
+                worker,
+                "_dispatch_dut_tests",
+                side_effect=dispatch,
+            ):
+                worker.run()
+
+        monitor.measure.assert_called_with(0)
         monitor.close.assert_called_once_with()
 
     def test_dolphin_mode_dispatch_selects_voltage_handler(self):
@@ -325,6 +520,59 @@ class WorkerControlTests(unittest.TestCase):
         self.assertIs(
             runner,
             HornbillVoltageMeasurementwithELoadwithOscilloscope.Execute_Voltage_Accuracy_Current_Static,
+        )
+
+    def test_hornbill_sinking_mode_uses_external_source_runner(self):
+        runner = voltage_test_executor.HORNBILL_SINKING_VOLTAGE_ACCURACY_RUNNERS[
+            "SinkingTest"
+        ]
+
+        self.assertIs(
+            runner,
+            HornbillVoltageMeasurementwithSinkBox_External_PSU_Capable_Source_and_Sink.Execute_Voltage_Accuracy_Current_Static,
+        )
+
+    def test_hornbill_none_eload_routes_to_no_load_voltage_runner(self):
+        runner = voltage_test_executor.HORNBILL_NO_ELOAD_VOLTAGE_ACCURACY_RUNNERS[
+            "CurrentStatic(VoltageChange)"
+        ]
+        self.assertIs(
+            runner,
+            HornbillVoltageMeasurementNoELoad.Execute_Voltage_Accuracy_Current_Static,
+        )
+
+        channels = []
+
+        def no_load_runner(_worker, _configuration, channel, worker=None):
+            channels.append(channel)
+            return ["info"], ["measured"], ["readback"]
+
+        worker = TestWorker(
+            {
+                "VoltageAccuracy": True,
+                "CurrentStatic(VoltageChange)": True,
+                "DataReport": False,
+            },
+            {"Instrument": "Keysight", "ELoad": "None"},
+            Parameters(DUT="Hornbill", noofloop=1, PSU_Channel=[1, 2]),
+        )
+        with patch.dict(
+            voltage_test_executor.HORNBILL_NO_ELOAD_VOLTAGE_ACCURACY_RUNNERS,
+            {"CurrentStatic(VoltageChange)": no_load_runner},
+            clear=True,
+        ):
+            worker._run_hornbill_voltage_accuracy(0)
+
+        self.assertEqual(channels, [1, 2])
+
+    def test_hornbill_none_eload_scope_mode_uses_no_load_scope_runner(self):
+        runner = voltage_test_executor.HORNBILL_NO_ELOAD_VOLTAGE_ACCURACY_RUNNERS[
+            "CurrentStatic(VoltageChange)withOscilloscope"
+        ]
+
+        self.assertIs(
+            runner,
+            HornbillVoltageMeasurementNoELoadWithOscilloscope.Execute_Voltage_Accuracy_Current_Static,
         )
 
     def test_voltage_accuracy_exports_only_on_final_loop(self):
